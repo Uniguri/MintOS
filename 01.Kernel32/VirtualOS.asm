@@ -1,4 +1,4 @@
-[ORG 0x0000]
+[ORG 0x10000]
 [BITS 16]
 
 SECTION .text
@@ -30,7 +30,7 @@ START:
         %if i == TOTAL_SELECTOR_COUNT
             jmp $
         %else
-            jmp (0x1000 + i * 0x20): 0x0000
+            jmp (0x1000 + i * 0x20):0x0000
         %endif
 
         times (512 - ($ - $$) % 512) db 0x00
