@@ -93,7 +93,7 @@ READ_END:
     call PRINT_MESSAGE
     add sp, 6
 
-    jmp 0x1000:0x0000
+    jmp 0x10000
 
 ; Functions
 HANDLE_DISK_ERROR:
@@ -151,7 +151,7 @@ PRINT_MESSAGE:
 
 ; DATA SECTION
 MESSAGE1: db 'MINT64 OS Boot Loader Start', 0
-DISK_ERROR_MESSAGE: db 'DIST Error', 0
+DISK_ERROR_MESSAGE: db 'DISK Error', 0
 IMAGE_LOADING_MESSAGE: db 'OS Image Loading...', 0
 LOADING_COMPLETE_MESSAGE: db 'Complete Loading', 0
 
