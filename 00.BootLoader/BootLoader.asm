@@ -74,7 +74,7 @@ READ_DATA:
     mov al, byte [SECTOR_NUMBER]
     add al, 0x01
     mov byte [SECTOR_NUMBER], al
-    cmp al, 19
+    cmp al, 37
     jl READ_DATA
 
     xor byte [HEAD_NUMBER], 0x01
@@ -93,7 +93,7 @@ READ_END:
     call PRINT_MESSAGE
     add sp, 6
 
-    jmp 0x10000
+    jmp 0x1000:0x0000
 
 ; Functions
 HANDLE_DISK_ERROR:

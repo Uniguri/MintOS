@@ -13,8 +13,8 @@ START:
     mov ax, cs
     mov ds, ax
     mov ax, 0xB800
-
     mov es, ax
+    
     ; Create each sector
     %assign i 0
     %rep TOTAL_SELECTOR_COUNT
