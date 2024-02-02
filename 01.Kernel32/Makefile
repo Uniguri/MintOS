@@ -2,7 +2,7 @@ NASM = nasm
 GCC = gcc -c -m32 -ffreestanding
 LD = ld -melf_i386 -T ../elf_i386.x -nostdlib -e Main -Ttext 0x10200
 
-OBJCOPY = x86_64-pc-linux-objcopy -j .text -j .data -j .rodata -j .bss -S -O binary
+OBJCOPY = objcopy -j .text -j .data -j .rodata -j .bss -S -O binary
 
 OBJ_DIR = Temp
 SRC_DIR	= Source
