@@ -8,9 +8,8 @@ START:
     mov ds, ax
     mov es, ax
 
-    cli
-    ; Load GDT
-    lgdt [GDTR]
+    cli ; Clear Interrupts
+    lgdt [GDTR] ; Load GDT
 
     mov eax, 0x4000003B ; PG=0, CD=1, NW=0, AM=0, WP=0, NE=1, ET=1, TS=1, EM=0, MP=1, PE=1
     mov cr0, eax
@@ -35,7 +34,7 @@ PROTECTED_MODE:
     call PRINT_MESSAGE
     add esp, 12
 
-    jmp $
+    jmp dword 0x08:0x10200
 
 ; Functions
 PRINT_MESSAGE:
@@ -81,12 +80,14 @@ PRINT_MESSAGE:
 ; Data
 align 8, db 0
 
+; Below is a code defining GDT and GDTR.
+; Check out: https://wiki.osdev.org/Global_Descriptor_Table
 dw 0x0000
-GDTR:
+GDTR: ; Global Descriptor Table Register
     dw GDT_END - GDT - 1
     dd (GDT - $$ + 0x10000)
 
-GDT:
+GDT: ; Global Descriptor Table
     NULL_DESCRIPTOR:
         dw 0x0000
         dw 0x0000
