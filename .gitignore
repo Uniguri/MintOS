@@ -1,5 +1,12 @@
 /.gdb_history
+
+01.Kernel32/Temp
+
 */*.bin
 *.bin
 */*.img
 *.img
+.elf
+*/.elf
+.o
+*/*.o
