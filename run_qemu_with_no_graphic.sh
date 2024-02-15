@@ -1,6 +1,5 @@
 #!/bin/sh
 
-make
 qemu-system-x86_64 -display curses \
     -L . -m 64 -M pc \
     -blockdev driver=file,node-name=f0,filename=./Disk.img \
