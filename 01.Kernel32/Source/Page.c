@@ -33,7 +33,7 @@ void kInitializePageTables(void) {
     }
   }
   {
-    // Mapping PDs on PAGE_DEFAUL_TSIZE(0x200000).
+    // Mapping PDs on PAGE_DEFAULT_SIZE(0x200000).
     // PDEntry[i]: base = i*0x200000, flags = (P|RW|PS).
     // So their size is 2MB.
     PDEntry* pd_entry = (PDEntry*)0x102000;
@@ -43,7 +43,7 @@ void kInitializePageTables(void) {
       const uint64 lower_mapping_addr = mapping_addr & 0xFFFFFFFF;
       kSetPageEntryData(&pd_entry[i], upper_mapping_addr, lower_mapping_addr,
                         PAGE_LOWER_FLAGS_DEFAULT | PAGE_LOWER_FLAGS_PS, 0);
-      mapping_addr += PAGE_DEFAUL_TSIZE;
+      mapping_addr += PAGE_DEFAULT_SIZE;
     }
   }
 }

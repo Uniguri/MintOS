@@ -16,6 +16,7 @@ bool kInitializeKernel64Area(void);
 
 void Main() {
   kPrintString(0, 3, "C Language Kernel Start.....................[Pass]");
+
   kPrintString(0, 4, "IA-32e Kernel Area Initialize...............[    ]");
   if (!kInitializeKernel64Area()) {
     kPrintString(45, 4, "Fail");
@@ -26,16 +27,38 @@ void Main() {
   kPrintString(0, 5, "IA-32e Page Tables Initialize...............[    ]");
   kInitializePageTables();
   kPrintString(45, 5, "Pass");
+
   {
+    // registers to store output of CPUID.
     uint32 eax = 0, ebx = 0, ecx = 0, edx = 0;
+    char cpu_vendor_name[13] = {
+        0,
+    };
+
+    // Read CPU vendor
+    kReadCPUID(0, &eax, &ebx, &ecx, &edx);
+    *((uint32*)cpu_vendor_name + 0) = ebx;
+    *((uint32*)cpu_vendor_name + 1) = edx;
+    *((uint32*)cpu_vendor_name + 2) = ecx;
+    kPrintString(0, 6,
+                 "Processor Vendor String.....................[            ]");
+    kPrintString(45, 6, cpu_vendor_name);
+
+    // Check for 64-bit support
     kReadCPUID(0x80000001, &eax, &ebx, &ecx, &edx);
-    kPrintString(0, 6, "64bit Mode Support Check....................[    ]");
+    kPrintString(0, 7, "64bit Mode Support Check....................[    ]");
     if (!(edx & (1 << 29))) {
-      kPrintString(45, 6, "Fail");
+      kPrintString(45, 7, "Fail");
       MAKE_STUCK(1);
     }
-    kPrintString(45, 6, "Pass");
+    kPrintString(45, 7, "Pass");
   }
+
+  // Switch mode to IA-32e
+  kPrintString(0, 8, "Switch To IA-32e Mode");
+  // Commented since we don't write 64 bit kernel.
+  // kSwitchAndExecute64bitKernel();
+
   MAKE_STUCK(1);
 }
 

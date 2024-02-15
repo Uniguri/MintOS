@@ -41,9 +41,11 @@
 // Default (P | RW) Page Flags.
 #define PAGE_LOWER_FLAGS_DEFAULT (PAGE_LOWER_FLAGS_P | PAGE_LOWER_FLAGS_RW)
 
+// Size of page table; 4KB
 #define PAGE_TABLE_SIZE 0x1000
 #define PAGE_MAX_ENTRY_COUNT 0x200
-#define PAGE_DEFAUL_TSIZE 0x200000
+// Size of page; 2MB
+#define PAGE_DEFAULT_SIZE 0x200000
 
 // A global structure for PML4Entry, PDPTEntry, PDEntry, PTEntry.
 typedef struct GlobalPageTableEntryStruct {
