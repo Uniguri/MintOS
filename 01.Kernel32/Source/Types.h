@@ -27,8 +27,8 @@
 
 #pragma pack(push, 1)
 typedef struct kCharactorStruct {
-  BYTE charactor;
-  BYTE attribute;
+  uint8 charactor;
+  uint8 attribute;
 } Character;
 #pragma pack(pop)
 
