@@ -1,10 +1,10 @@
-#ifndef __MINTOS_TYPES_H_
-#define __MINTOS_TYPES_H_
+#ifndef MINTOS_TYPES_H_
+#define MINTOS_TYPES_H_
 
 #define int8 char
 #define int16 short
 #define int32 int
-#define int64 long
+#define int64 long long
 #define uint8 unsigned int8
 #define uint16 unsigned int16
 #define uint32 unsigned int32
@@ -26,10 +26,16 @@
 #define NULLPTR ((void*)0)
 
 #pragma pack(push, 1)
+// Structure for video memory. Video memory locate on 0xB8000 when in protected
+// mode. This structure contains two members: charactor, attribute.
+// The charactor means code; It is like 'A', 'B', ...
+// The attribute means background and foreground colors.
+// check out https://en.wikipedia.org/wiki/VGA_text_mode.
 typedef struct kCharactorStruct {
   uint8 charactor;
   uint8 attribute;
 } Character;
 #pragma pack(pop)
+_Static_assert(sizeof(Character) == 2, "kCharactorStruct struct size != 2");
 
 #endif
