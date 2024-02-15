@@ -10,9 +10,9 @@
 #define uint32 unsigned int32
 #define uint64 unsigned int64
 #define bool uint8
-#define BYTE uint16
-#define WORD uint32
-#define DWORD uint64
+#define BYTE uint8
+#define WORD uint16
+#define DWORD uint32
 #define QWORD uint64
 #define BOOL uint8
 

@@ -16,10 +16,10 @@ $(OBJ_DIR)/EntryPoint.bin: $(SRC_DIR)/EntryPoint.s
 	$(NASM) -o $@ $<
 
 dep:
-	make -C $(OBJ_DIR) -f ../makefile InternalDependency
+	make -C $(OBJ_DIR) -f ../Makefile InternalDependency
 
 ExecuteInternalBuild: dep
-	make -C $(OBJ_DIR) -f ../makefile Kernel32.elf
+	make -C $(OBJ_DIR) -f ../Makefile Kernel32.elf
 
 $(OBJ_DIR)/Kernel32.elf.bin: ExecuteInternalBuild
 	$(OBJCOPY) $(OBJ_DIR)/Kernel32.elf $@
