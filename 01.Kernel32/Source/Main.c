@@ -2,8 +2,6 @@
 #include "Page.h"
 #include "Types.h"
 
-#define MAKE_STUCK(x) while (x)
-
 // Print string on (x, y).
 // This function does not change attrubutes.
 // @param x: 0 means left. (0 <= x < 80)
@@ -14,9 +12,14 @@ void kPrintString(const int x, const int y, const char* string);
 // @return false when fail to set.
 bool kInitializeKernel64Area(void);
 
-void Main() {
-  kPrintString(0, 3, "C Language Kernel Start.....................[Pass]");
+// Copy kernel64(IA-32e mode Kernel) image to 0x200000(2MB)
+void kCopyKernel64ImageTo2MB(void);
 
+void Main() {
+#define MAKE_STUCK(x) while (x)
+  kPrintString(0, 3, "Protected Mode C Language Kernel Start......[Pass]");
+
+  // Initialize memory([0x100000, 0x600000)) for IA-32e mode Kernel.
   kPrintString(0, 4, "IA-32e Kernel Area Initialize...............[    ]");
   if (!kInitializeKernel64Area()) {
     kPrintString(45, 4, "Fail");
@@ -24,6 +27,7 @@ void Main() {
   }
   kPrintString(45, 4, "Pass");
 
+  // Create page tables for IA-32e mode Kernel.
   kPrintString(0, 5, "IA-32e Page Tables Initialize...............[    ]");
   kInitializePageTables();
   kPrintString(45, 5, "Pass");
@@ -54,12 +58,17 @@ void Main() {
     kPrintString(45, 7, "Pass");
   }
 
+  // Copy kernel64(IA-32e mode Kernel) image to 0x200000(2MB).
+  kPrintString(0, 8, "Copy IA-32e Kernel To 2M Address............[    ]");
+  kCopyKernel64ImageTo2MB();
+  kPrintString(45, 8, "Pass");
+
   // Switch mode to IA-32e
-  kPrintString(0, 8, "Switch To IA-32e Mode");
-  // Commented since we don't write 64 bit kernel.
-  // kSwitchAndExecute64bitKernel();
+  kPrintString(0, 9, "Switch To IA-32e Mode");
+  kSwitchAndExecute64bitKernel();
 
   MAKE_STUCK(1);
+#undef MAKE_STUCK
 }
 
 void kPrintString(const int x, const int y, const char* string) {
@@ -81,4 +90,26 @@ bool kInitializeKernel64Area(void) {
   }
 
   return true;
+}
+
+void kCopyKernel64ImageTo2MB(void) {
+  const uint32 kSectorSize = 0x200;
+
+  // BootLoader addr=0x7C00, TOTAL_SELECTOR_COUNT offset=0x02
+  const uint16 kTotalSectorCount = *(uint16*)(0x7C00 + 0x02);
+  // BootLoader addr=0x7C00, KERNEL32_SECTOR_COUNT offset=0x04
+  const uint16 kKernel32SectorCount = *(uint16*)(0x7C00 + 0x04);
+  // kKernel32SectorCount + kKernel64SectorCount = kTotalSectorCount
+  const uint16 kKernel64SectorCount = kTotalSectorCount - kKernel32SectorCount;
+
+  // Kernel images are loaded on 0x10000.
+  // So, Kernel64 image is loaded on 0x10000+kKernel32SectorCount*kSectorSize.
+  uint32* src_addr = (uint32*)(0x10000 + kKernel32SectorCount * kSectorSize);
+  // Kernel64 image is loaded on 0x200000(2MB).
+  uint32* dst_addr = (uint32*)(0x200000);
+  for (int i = 0; i < kKernel64SectorCount; ++i) {
+    for (int j = 0; j < 512 / 4; ++j) {
+      *(dst_addr++) = *(src_addr++);
+    }
+  }
 }

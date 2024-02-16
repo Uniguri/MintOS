@@ -5,7 +5,10 @@ SECTION .text
 
 jmp START
 
-TOTAL_SELECTOR_COUNT: dw 1
+; The number of all sectors except BootLoader. addr=0x7C02
+TOTAL_SELECTOR_COUNT: dw 0xDEAD
+; The number of protected mode sectors. addr=0x7C04
+KERNEL32_SECTOR_COUNT: dw 0xBEEF
 
 START:
   mov ax, 0xB800
