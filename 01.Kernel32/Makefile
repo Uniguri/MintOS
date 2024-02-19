@@ -1,6 +1,6 @@
 # Makefile
 NASM = nasm -f bin
-GCC = gcc -c -m32 -ffreestanding -masm=intel -O3
+GCC = gcc -c -m32 -ffreestanding -masm=intel
 LD = ld -melf_i386 -T ../elf_i386.x -nostdlib -e Main -Ttext 0x10200
 
 OBJCOPY = objcopy -j .text -j .data -j .rodata -j .bss -S -O binary
