@@ -9,3 +9,4 @@ Check out https://github.com/kkamagui/mint64os-examples/.
 ## Not written
 - I did not write code enabling A20 Gate.
 - I did not write code checking memory size.
+- I did not write code controlling keyboard LED.
