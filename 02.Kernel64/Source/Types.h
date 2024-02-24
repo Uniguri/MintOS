@@ -9,6 +9,7 @@
 #define uint16 unsigned int16
 #define uint32 unsigned int32
 #define uint64 unsigned int64
+#define size_t uint64
 #define bool uint8
 #define BYTE uint8
 #define WORD uint16
