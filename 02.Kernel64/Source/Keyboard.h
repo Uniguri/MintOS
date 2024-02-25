@@ -65,16 +65,6 @@ typedef struct kKeyboardManagerStruct {
 } KeyboardManager;
 #pragma pack(pop)
 
-// Get data of PS/2's register.
-// @param port: port number of register; 0x60 and 0x64 are allowed.
-// @return data of the register
-uint8 kGetPortByte(uint8 port);
-
-// Set data of PS/2's register.
-// @param port: port number of register; 0x60 and 0x64 are allowed.
-// @param data: data to set on port.
-void kSetPortByte(uint8 port, uint8 data);
-
 // Check whether there is an element on PS/2's output buffer(port 0x64 : bit 0).
 // @return true when output buffer full
 bool kIsOutputBufferFull(void);

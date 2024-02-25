@@ -1,7 +1,7 @@
 # Makefile
 NASM = nasm -f elf64
 GCC = gcc -c -m64 -ffreestanding -masm=intel
-LD = ld -melf_x86_64 -T ../elf_x86_64.x -nostdlib -e Main -Ttext 0x10200
+LD = ld -melf_x86_64 -T ../elf_x86_64.x -nostdlib -e Main -Ttext 0x200000
 
 OBJCOPY = objcopy -j .text -j .data -j .rodata -j .bss -S -O binary
 

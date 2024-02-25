@@ -1,6 +1,4 @@
-#include "Utility.h"
-
-#include "Types.h"
+#include "Memory.h"
 
 void* memset(void* ptr, int val, size_t num) {
   uint8* p = (uint8*)ptr;

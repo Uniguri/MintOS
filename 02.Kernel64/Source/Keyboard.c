@@ -1,30 +1,13 @@
 #include "Keyboard.h"
 
+#include "HardwarePort.h"
 #include "Macro.h"
 #include "Types.h"
 
-uint8 kGetPortByte(uint8 port) {
-  uint64 data = 0;
-  asm volatile(
-      // Read data from port
-      "in al, dx\n"
-      : [data] "=a"(data)
-      : [port] "d"(port));
-  return (uint8)(data & 0xFF);
-}
+#define GET_PORT_STATUS() kGetPortByte(0x64)
+bool kIsOutputBufferFull(void) { return IS_BIT_SET(GET_PORT_STATUS(), 0); }
 
-void kSetPortByte(uint8 port, uint8 data) {
-  uint8 p = port, d = data;
-  asm volatile(
-      // Set data on port.
-      "out dx, al\n"
-      :
-      : [port] "d"((uint64)port), [data] "a"(data));
-}
-
-bool kIsOutputBufferFull(void) { return IS_BIT_SET(kGetPortByte(0x64), 0); }
-
-bool kIsInputBufferFull(void) { return IS_BIT_SET(kGetPortByte(0x64), 1); }
+bool kIsInputBufferFull(void) { return IS_BIT_SET(GET_PORT_STATUS(), 1); }
 
 void kClearOutputPortByte(void) {
   while (!kIsOutputBufferFull())
@@ -33,7 +16,6 @@ void kClearOutputPortByte(void) {
 
 #define GET_PORT_DATA() kGetPortByte(0x60)
 #define SET_PORT_DATA(data) kSetPortByte(0x60, data)
-#define GET_PORT_STATUS() kGetPortByte(0x64)
 #define SEND_COMMAND(cmd) kSetPortByte(0x64, cmd)
 
 bool kActivateKeyboard(void) {
