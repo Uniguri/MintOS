@@ -37,6 +37,7 @@ void Main(void) {
   kMaskPICInterrupt(0);
   kEnableInterrupt();
   kPrintString(45, 16, "Pass");
+  kClearOutputPortByte();
 
   int location = 0;
   while (1) {
