@@ -23,12 +23,12 @@ void kInitializePIC(void) {
   kSetPortByte(PIC_SLAVE_DATA_PORT, BIT(0));
 }
 
-void kMaskPICInterrupt(uint16 irq_bit_mask) {
+inline void kMaskPICInterrupt(uint16 irq_bit_mask) {
   kSetPortByte(PIC_MASTER_DATA_PORT, (uint8)irq_bit_mask);
   kSetPortByte(PIC_SLAVE_DATA_PORT, (uint8)(irq_bit_mask >> 8));
 }
 
-void kSendEOIToPIC(int irq_number) {
+inline void kSendEOIToPIC(int irq_number) {
   // OCW2(0x20), EOI
   kSetPortByte(PIC_MASTER_CMD_PORT, BIT(5));
 

@@ -1,5 +1,6 @@
 #include "InterruptHandler.h"
 
+#include "Keyboard.h"
 #include "PIC.h"
 #include "String.h"
 
@@ -43,6 +44,11 @@ void kKeyboardHandler(int vector_number) {
   buffer[8] = '0' + keyboard_interrupt_count;
   keyboard_interrupt_count = (keyboard_interrupt_count + 1) % 10;
   kPrintString(0, 0, buffer);
+
+  if (kIsOutputBufferFull()) {
+    uint8 scan_code = kGetKeyboardScanCode();
+    kConvertScanCodeAndPushToQueue(scan_code);
+  }
 
   kSendEOIToPIC(vector_number - PIC_IRQ_START_VECTOR);
 }

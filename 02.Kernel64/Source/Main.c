@@ -24,8 +24,8 @@ void Main(void) {
   kLoadIDTR(IDTR_START_ADDRESS);
   kPrintString(45, 14, "Pass");
 
-  kPrintString(0, 15, "Keyboard Activate...........................[    ]");
-  if (kActivateKeyboard() == TRUE) {
+  kPrintString(0, 15, "Keyboard Activate And Queue Initialize......[    ]");
+  if (kInitializeKeyboard()) {
     kPrintString(45, 15, "Pass");
   } else {
     kPrintString(45, 15, "Fail");
@@ -37,25 +37,17 @@ void Main(void) {
   kMaskPICInterrupt(0);
   kEnableInterrupt();
   kPrintString(45, 16, "Pass");
-  kClearOutputPortByte();
 
   int location = 0;
   while (1) {
-    uint8 scan_code = 0;
-    if (kIsOutputBufferFull()) {
-      scan_code = kGetKeyboardScanCode();
-    }
-
-    uint8 ascii[2] = {
-        0,
-    };
-    enum KeyFlag flag;
-    if (kConvertScanCodeToAsciiCode(scan_code, &ascii[0], &flag)) {
-      if (flag == kFlagDown) {
+    KeyData key_data;
+    if (kGetKeyFromKeyQueue(&key_data)) {
+      if (key_data.flag == kFlagDown) {
+        char ascii[2] = {key_data.ascii_code, 0};
         kPrintString(location++, 17, ascii);
 
-        if (ascii[0] == '0') {
-          int temp = 100 / 0;
+        if (*ascii == '0') {
+          *ascii /= 0;
         }
       }
     }

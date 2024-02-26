@@ -63,9 +63,38 @@ typedef struct kKeyboardManagerStruct {
   bool extened_code_in;
   int skip_count_for_pause;
 } KeyboardManager;
+
+typedef struct kKeyDataStruct {
+  uint8 scan_code;
+  uint8 ascii_code;
+  enum KeyFlag flag;
+} KeyData;
 #pragma pack(pop)
 
-// Check whether there is an element on PS/2's output buffer(port 0x64 : bit 0).
+// Initialize keyboard. things initialized:
+// - queue
+// - PS/2
+// @return True if success.
+bool kInitializeKeyboard(void);
+
+// Convert scan code to ascii and push it to queue.
+// @param scan_code: scan code to convert and push.
+// @return True if success.
+bool kConvertScanCodeAndPushToQueue(uint8 scan_code);
+
+bool kWaitForACKAndPutOtherScanCode(void);
+
+// Get key from queue.
+// @param data: the pointer of key data to store.
+// @return True if success.
+bool kGetKeyFromKeyQueue(KeyData* key_data);
+
+// Wait and get scan code.
+// @return scan code
+uint8 kGetKeyboardScanCode(void);
+
+// Check whether there is an element on PS/2's output buffer(port 0x64 : bit
+// 0).
 // @return true when output buffer full
 bool kIsOutputBufferFull(void);
 
@@ -82,10 +111,6 @@ bool kActivateKeyboard(void);
 
 // Reboot PS/2.
 void kRebootPS2(void);
-
-// Wait and get scan code.
-// @return scan code
-uint8 kGetKeyboardScanCode(void);
 
 // @param scan_code: scan code
 // @return true if we need to use combined code.

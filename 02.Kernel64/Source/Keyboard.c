@@ -1,78 +1,10 @@
 #include "Keyboard.h"
 
 #include "HardwarePort.h"
+#include "Interrupt.h"
 #include "Macro.h"
+#include "Queue.h"
 #include "Types.h"
-
-#define GET_PORT_STATUS() kGetPortByte(0x64)
-bool kIsOutputBufferFull(void) { return IS_BIT_SET(GET_PORT_STATUS(), 0); }
-
-bool kIsInputBufferFull(void) { return IS_BIT_SET(GET_PORT_STATUS(), 1); }
-
-void kClearOutputPortByte(void) {
-  while (!kIsOutputBufferFull())
-    ;
-}
-
-#define GET_PORT_DATA() kGetPortByte(0x60)
-#define SET_PORT_DATA(data) kSetPortByte(0x60, data)
-#define SEND_COMMAND(cmd) kSetPortByte(0x64, cmd)
-
-bool kActivateKeyboard(void) {
-  // Send enable command(0xAE) to command register(0x64).
-  SEND_COMMAND(0xAE);
-  // Wait until input buffer is claen.
-  for (int i = 0; i < 0xFFFF; ++i) {
-    if (!kIsInputBufferFull()) {
-      break;
-    }
-  }
-
-  // Send enable scanning(0xF4) to data port.
-  SET_PORT_DATA(0xF4);
-  // Wait until enabled.
-  for (int i = 0; i < 100; ++i) {
-    // Wait until output buffer is claen.
-    for (int i = 0; i < 0xFFFF; ++i) {
-      if (!kIsOutputBufferFull()) {
-        break;
-      }
-    }
-    // Check a response(0xFA) of the enable command(0xF4).
-    if (GET_PORT_DATA() == 0xFA) {
-      return true;
-    }
-  }
-
-  kClearOutputPortByte();
-
-  // Fail to activate keyboard.
-  return false;
-}
-
-void kRebootPS2(void) {
-  for (int i = 0; i < 0xFF; ++i) {
-    if (!kIsInputBufferFull()) {
-      break;
-    }
-  }
-
-  // 0xD1: Write next byte to Controller Output Port.
-  SEND_COMMAND(0xD1);
-  // 0x00: System reset (output).
-  SET_PORT_DATA(0x00);
-
-  while (1)
-    ;
-}
-
-uint8 kGetKeyboardScanCode(void) {
-  kClearOutputPortByte();
-  // Get scan code.
-  const uint8 code = GET_PORT_DATA();
-  kClearOutputPortByte();
-  return code;
-}
 
 static KeyboardManager keyboard_manager = {
     0,
@@ -168,6 +100,135 @@ static KeyMappingEntry key_mapping_table[KEY_MAPPING_TABLE_MAX_COUNT] = {
     {kF11, kF11},
     {kF12, kF12}};
 
+#define KEY_MAX_QUEUE_COUNT 100
+static Queue key_queue;
+static KeyData key_queue_buffer[KEY_MAX_QUEUE_COUNT];
+
+inline bool kInitializeKeyboard(void) {
+  kInitializeQueue(&key_queue, key_queue_buffer, KEY_MAX_QUEUE_COUNT,
+                   sizeof(KeyData));
+
+  return kActivateKeyboard();
+}
+
+bool kConvertScanCodeAndPushToQueue(uint8 scan_code) {
+  KeyData key_data = {
+      0,
+  };
+  key_data.scan_code = scan_code;
+
+  bool ret = false;
+  if (kConvertScanCodeToAsciiCode(scan_code, &key_data.ascii_code,
+                                  &key_data.flag)) {
+    bool previouse_interrupt_status = kIsInterruptEnabled();
+    kSetInterruptFlag(false);
+    ret = kPushQueue(&key_queue, &key_data);
+    kSetInterruptFlag(previouse_interrupt_status);
+  }
+
+  return ret;
+}
+#undef KEY_MAX_QUEUE_COUNT
+
+bool kGetKeyFromKeyQueue(KeyData* key_data) {
+  if (kIsQueueEmpty(&key_queue)) {
+    return false;
+  }
+
+  bool previouse_interrupt_status = kIsInterruptEnabled();
+  bool ret = true;
+  kSetInterruptFlag(false);
+  ret &= kGetFrontFromQueue(&key_queue, key_data);
+  ret &= kPopQueue(&key_queue);
+  kSetInterruptFlag(previouse_interrupt_status);
+
+  return ret;
+}
+
+#define GET_PORT_DATA() kGetPortByte(0x60)
+bool kWaitForACKAndPutOtherScanCode(void) {
+  bool ret = false;
+  for (int i = 0; i < 100; ++i) {
+    for (int j = 0; j < 0xFFFF; ++j) {
+      if (kIsOutputBufferFull()) {
+        break;
+      }
+    }
+
+    uint8 data = GET_PORT_DATA();
+    // When data is ACK(0xFA)
+    if (data == 0xFA) {
+      ret = true;
+      break;
+    } else {
+      kConvertScanCodeAndPushToQueue(data);
+    }
+  }
+
+  return ret;
+}
+
+#define GET_PORT_STATUS() kGetPortByte(0x64)
+inline bool kIsOutputBufferFull(void) {
+  return IS_BIT_SET(GET_PORT_STATUS(), 0);
+}
+
+inline bool kIsInputBufferFull(void) {
+  return IS_BIT_SET(GET_PORT_STATUS(), 1);
+}
+
+inline void kClearOutputPortByte(void) {
+  while (!kIsOutputBufferFull())
+    ;
+}
+
+#define SET_PORT_DATA(data) kSetPortByte(0x60, data)
+#define SEND_COMMAND(cmd) kSetPortByte(0x64, cmd)
+bool kActivateKeyboard(void) {
+  bool previous_interrupt_status = kIsInterruptEnabled();
+  kSetInterruptFlag(false);
+
+  // Send enable command(0xAE) to command register(0x64).
+  SEND_COMMAND(0xAE);
+  // Wait until input buffer is claen.
+  for (int i = 0; i < 0xFFFF; ++i) {
+    if (!kIsInputBufferFull()) {
+      break;
+    }
+  }
+
+  // Send enable scanning(0xF4) to data port.
+  SET_PORT_DATA(0xF4);
+  bool ret = kWaitForACKAndPutOtherScanCode();
+
+  kSetInterruptFlag(previous_interrupt_status);
+
+  return ret;
+}
+
+void kRebootPS2(void) {
+  for (int i = 0; i < 0xFF; ++i) {
+    if (!kIsInputBufferFull()) {
+      break;
+    }
+  }
+
+  // 0xD1: Write next byte to Controller Output Port.
+  SEND_COMMAND(0xD1);
+  // 0x00: System reset (output).
+  SET_PORT_DATA(0x00);
+
+  while (1)
+    ;
+}
+
+inline uint8 kGetKeyboardScanCode(void) {
+  kClearOutputPortByte();
+  //  Get scan code.
+  const uint8 code = GET_PORT_DATA();
+  return code;
+}
+
 #define GET_DOWN_CODE(code) (code & 0x7F)
 bool kIsUseCombinedCode(const uint8 scan_code) {
   const uint8 down_scan_code = GET_DOWN_CODE(scan_code);
@@ -191,18 +252,18 @@ bool kIsUseCombinedCode(const uint8 scan_code) {
   return false;
 }
 
-bool kIsAlphabetScanCode(const uint8 scan_code) {
+inline bool kIsAlphabetScanCode(const uint8 scan_code) {
   uint8 nomal_code = key_mapping_table[scan_code].normal_code;
   return ('a' <= nomal_code && nomal_code <= 'z');
 }
 
-bool kIsNumberOrSymbolScanCode(const uint8 scan_code) {
+inline bool kIsNumberOrSymbolScanCode(const uint8 scan_code) {
   // scan code 2 ~ 53 are number + alphabet + symbols.
   // Thus, scan code is number or symbol when in [2, 53] and is not alphabet.
   return (2 <= scan_code && scan_code <= 53 && !kIsAlphabetScanCode(scan_code));
 }
 
-bool kIsNumberPadScanCode(const uint8 scan_code) {
+inline bool kIsNumberPadScanCode(const uint8 scan_code) {
   // scan code 71 ~ 88 are key on numpad.
   return (71 <= scan_code && scan_code <= 83);
 }

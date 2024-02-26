@@ -13,4 +13,8 @@ void kDisableInterrupt(void);
 // @return value of RFLAGS
 uint64 kGetRFlags(void);
 
+bool kIsInterruptEnabled(void);
+
+void kSetInterruptFlag(bool interrupt_status);
+
 #endif

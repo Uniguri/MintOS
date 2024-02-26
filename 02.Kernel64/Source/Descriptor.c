@@ -121,15 +121,15 @@ void kInitializeIDTTables(void) {
   }
 }
 
-void kLoadGDTR(uint64 gdtr_addr) {
+inline void kLoadGDTR(uint64 gdtr_addr) {
   asm volatile("lgdt [%[gdtr_addr]]" : : [gdtr_addr] "r"(gdtr_addr));
 }
-void kLoadTR(uint16 tss_segment_offset) {
+inline void kLoadTR(uint16 tss_segment_offset) {
   asm volatile("ltr %[tss_segment_offset]"
                :
                : [tss_segment_offset] "r"(tss_segment_offset));
 }
-void kLoadIDTR(uint64 idtr_addr) {
+inline void kLoadIDTR(uint64 idtr_addr) {
   asm volatile("lidt [%[idtr_addr]]" : : [idtr_addr] "r"(idtr_addr));
 }
 
