@@ -1,8 +1,8 @@
-#include "HardwarePort.h"
+#include "Hardware.h"
 
 #include "Types.h"
 
-inline uint8 kGetPortByte(uint8 port) {
+inline uint8 kGetPortByte(uint16 port) {
   uint64 data = 0;
   asm volatile(
       // Read data from port
@@ -12,8 +12,8 @@ inline uint8 kGetPortByte(uint8 port) {
   return (uint8)(data & 0xFF);
 }
 
-inline void kSetPortByte(uint8 port, uint8 data) {
-  uint8 p = port, d = data;
+inline void kSetPortByte(uint16 port, uint8 data) {
+  uint16 p = port, d = data;
   asm volatile(
       // Set data on port.
       "out dx, al\n"

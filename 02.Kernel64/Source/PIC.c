@@ -1,6 +1,6 @@
 #include "PIC.h"
 
-#include "HardwarePort.h"
+#include "Hardware.h"
 #include "Macro.h"
 
 void kInitializePIC(void) {

@@ -1,57 +1,54 @@
+#include "Console.h"
+#include "ConsoleShell.h"
 #include "Descriptor.h"
 #include "Interrupt.h"
 #include "Keyboard.h"
 #include "PIC.h"
-#include "String.h"
 #include "Types.h"
 
 void Main(void) {
 #define DO_STUCK_IF(x) while (x)
-  kPrintString(0, 10, "Switch To IA-32e Mode Success~!!");
-  kPrintString(0, 11, "IA-32e C Language Kernel Start..............[Pass]");
+  int cursor_x = 0, cursor_y = 10;
 
-  kPrintString(0, 12, "GDT Initialize And Switch For IA-32e Mode...[    ]");
+  kInitializeConsole(cursor_x, cursor_y);
+  printf("Switch To IA-32e Mode Success~!!\n");
+  printf("IA-32e C Language Kernel Start..............[Pass]\n");
+
+  kGetCursor(&cursor_x, &cursor_y);
+  printf("GDT Initialize And Switch For IA-32e Mode...[    ]");
   kInitializeGDTTableAndTSS();
   kLoadGDTR(GDTR_START_ADDRESS);
-  kPrintString(45, 12, "Pass");
+  kSetCursor(45, cursor_y++);
+  printf("Pass\n");
 
-  kPrintString(0, 13, "TSS Segment Load............................[    ]");
+  printf("TSS Segment Load............................[    ]");
   kLoadTR(GDT_TSS_SEGMENT);
-  kPrintString(45, 13, "Pass");
+  kSetCursor(45, cursor_y++);
+  printf("Pass\n");
 
-  kPrintString(0, 14, "IDT Initialize..............................[    ]");
+  printf("IDT Initialize..............................[    ]");
   kInitializeIDTTables();
   kLoadIDTR(IDTR_START_ADDRESS);
-  kPrintString(45, 14, "Pass");
+  kSetCursor(45, cursor_y++);
+  printf("Pass\n");
 
-  kPrintString(0, 15, "Keyboard Activate And Queue Initialize......[    ]");
+  printf("Keyboard Activate And Queue Initialize......[    ]");
+  kSetCursor(45, cursor_y++);
   if (kInitializeKeyboard()) {
-    kPrintString(45, 15, "Pass");
+    printf("Pass\n");
   } else {
-    kPrintString(45, 15, "Fail");
+    printf("Fail\n");
     DO_STUCK_IF(1);
   }
 
-  kPrintString(0, 16, "PIC Controller And Interrupt Initialize.....[    ]");
+  printf("PIC Controller And Interrupt Initialize.....[    ]");
   kInitializePIC();
   kMaskPICInterrupt(0);
   kEnableInterrupt();
-  kPrintString(45, 16, "Pass");
+  kSetCursor(45, cursor_y++);
+  printf("Pass\n");
 
-  int location = 0;
-  while (1) {
-    KeyData key_data;
-    if (kGetKeyFromKeyQueue(&key_data)) {
-      if (key_data.flag == kFlagDown) {
-        char ascii[2] = {key_data.ascii_code, 0};
-        kPrintString(location++, 17, ascii);
-
-        if (*ascii == '0') {
-          *ascii /= 0;
-        }
-      }
-    }
-  }
+  kStartConsoleShell();
 
   // We dont need "while(1);" here because "jmp $" in EntryPoint.s
 #undef DO_STUCK_IF

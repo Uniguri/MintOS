@@ -1,8 +1,8 @@
 #include "InterruptHandler.h"
 
+#include "Console.h"
 #include "Keyboard.h"
 #include "PIC.h"
-#include "String.h"
 
 void kCommonExceptionHandler(int vector_number, uint64 error_code) {
 #define DO_STUCT_IF(x) while (x)
@@ -13,11 +13,11 @@ void kCommonExceptionHandler(int vector_number, uint64 error_code) {
   buffer[0] = '0' + vector_number / 10;
   buffer[1] = '0' + vector_number % 10;
 
-  kPrintString(0, 0, "====================================================");
-  kPrintString(0, 1, "                 Exception Occur~!!!!               ");
-  kPrintString(0, 2, "                    Vector:                         ");
-  kPrintString(27, 2, buffer);
-  kPrintString(0, 3, "====================================================");
+  kPrintStringXY(0, 0, "====================================================");
+  kPrintStringXY(0, 1, "                 Exception Occur~!!!!               ");
+  kPrintStringXY(0, 2, "                    Vector:                         ");
+  kPrintStringXY(27, 2, buffer);
+  kPrintStringXY(0, 3, "====================================================");
 
   DO_STUCT_IF(1);
 #undef DO_STUCT_IF
@@ -30,7 +30,7 @@ void kCommonInterruptHandler(int vector_number) {
   buffer[6] = '0' + vector_number % 10;
   buffer[8] = '0' + common_interrupt_count;
   common_interrupt_count = (common_interrupt_count + 1) % 10;
-  kPrintString(70, 0, buffer);
+  kPrintStringXY(70, 0, buffer);
 
   kSendEOIToPIC(vector_number - PIC_IRQ_START_VECTOR);
 }
@@ -43,7 +43,7 @@ void kKeyboardHandler(int vector_number) {
   buffer[6] = '0' + vector_number % 10;
   buffer[8] = '0' + keyboard_interrupt_count;
   keyboard_interrupt_count = (keyboard_interrupt_count + 1) % 10;
-  kPrintString(0, 0, buffer);
+  kPrintStringXY(0, 0, buffer);
 
   if (kIsOutputBufferFull()) {
     uint8 scan_code = kGetKeyboardScanCode();
