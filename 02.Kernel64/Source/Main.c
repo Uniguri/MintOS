@@ -3,11 +3,12 @@
 #include "Descriptor.h"
 #include "Interrupt.h"
 #include "Keyboard.h"
+#include "Memory.h"
 #include "PIC.h"
 #include "Types.h"
 
 void Main(void) {
-#define DO_STUCK_IF(x) while (x)
+#define DO_STUCK_IF(x) while ((x))
   int cursor_x = 0, cursor_y = 10;
 
   kInitializeConsole(cursor_x, cursor_y);
@@ -31,6 +32,11 @@ void Main(void) {
   kLoadIDTR(IDTR_START_ADDRESS);
   kSetCursor(45, cursor_y++);
   printf("Pass\n");
+
+  printf("Total RAM Size Check........................[    ]");
+  kCalculateRamSize();
+  kSetCursor(45, cursor_y++);
+  printf("Pass], Size = %d MB\n", kGetRamSize());
 
   printf("Keyboard Activate And Queue Initialize......[    ]");
   kSetCursor(45, cursor_y++);

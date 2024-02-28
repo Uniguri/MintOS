@@ -80,7 +80,7 @@ int kConsolePrintString(const char* buffer) {
   return print_offset;
 }
 
-inline void kClearScreen(void) {
+void kClearScreen(void) {
   Character* screen = (Character*)CONSOLE_VIDEO_MEMORY_ADDRESS;
   for (size_t i = 0; i < CONSOLE_WIDTH * CONSOLE_HEIGHT; ++i) {
     screen[i].charactor = ' ';

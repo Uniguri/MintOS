@@ -36,10 +36,14 @@ int32 Int32FromHexString(const char* hex);
 int32 Int32FromDecimalString(const char* decimal);
 int64 Int64FromHexString(const char* hex);
 int64 Int64FromDecimalString(const char* decimal);
+uint64 Uint64FromHexString(const char* hex);
+uint64 Uint64FromDecimalString(const char* decimal);
 size_t HexStringFromInt32(int32 decimal, char* buffer);
 size_t DecimalStringFromInt32(int32 decimal, char* buffer);
 size_t HexStringFromInt64(int64 decimal, char* buffer);
 size_t DecimalStringFromInt64(int64 decimal, char* buffer);
+size_t HexStringFromUint64(uint64 decimal, char* buffer);
+size_t DecimalStringFromUint64(uint64 decimal, char* buffer);
 
 size_t itoa(int32 i, char* buffer);
 size_t itoa_with_radix(int32 i, char* buffer, int radix);

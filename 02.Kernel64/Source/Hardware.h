@@ -11,4 +11,5 @@ uint8 kGetPortByte(uint16 port);
 // @param data: data to set on port.
 void kSetPortByte(uint16 port, uint8 data);
 
+uint64 kReadTSC(void);
 #endif

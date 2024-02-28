@@ -5,7 +5,7 @@
 #include "PIC.h"
 
 void kCommonExceptionHandler(int vector_number, uint64 error_code) {
-#define DO_STUCT_IF(x) while (x)
+#define DO_STUCT_IF(x) while ((x))
   char buffer[3] = {
       0,
   };

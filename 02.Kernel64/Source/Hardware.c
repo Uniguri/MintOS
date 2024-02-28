@@ -20,3 +20,9 @@ inline void kSetPortByte(uint16 port, uint8 data) {
       :
       : [port] "d"((uint64)port), [data] "a"(data));
 }
+
+inline uint64 kReadTSC(void) {
+  uint32 high, low;
+  asm volatile("rdtsc;" : "=a"(low), "=d"(high) :);
+  return ((uint64)high << 32) | low;
+}

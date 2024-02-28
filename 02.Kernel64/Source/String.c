@@ -14,7 +14,7 @@ inline int sprintf(char* buffer, const char* format, ...) {
   return ret;
 }
 
-int snprintf(char* buffer, size_t n, const char* format, ...) {
+inline int snprintf(char* buffer, size_t n, const char* format, ...) {
   va_list va;
 
   va_start(va, format);
@@ -64,27 +64,27 @@ int vsnprintf(char* buffer, size_t n, const char* format, va_list va) {
         case 'd':
         case 'D': {
           const int32 val = (int32)va_arg(va, int32);
-          idx += itoa(val, &buffer[idx]);
+          idx += DecimalStringFromInt32(val, &buffer[idx]);
           break;
         }
 
         case 'x':
         case 'X': {
           const int32 val = (int32)va_arg(va, int32);
-          idx += itoa_with_radix(val, &buffer[idx], 16);
+          idx += HexStringFromInt64(val, &buffer[idx]);
           break;
         }
 
         case 'p': {
-          const int64 val = (int64)va_arg(va, int64);
-          idx += ltoa_with_radix(val, &buffer[idx], 16);
+          const uint64 val = (uint64)va_arg(va, uint64);
+          idx += HexStringFromUint64(val, &buffer[idx]);
           break;
         }
 
         case 'q':
         case 'Q': {
           const int64 val = (int64)va_arg(va, int64);
-          idx += ltoa(val, &buffer[idx]);
+          idx += DecimalStringFromInt64(val, &buffer[idx]);
           break;
         }
 
@@ -116,7 +116,7 @@ inline int toupper(int c) {
   return c;
 }
 
-inline char* strchr(const char* s, char c) {
+char* strchr(const char* s, char c) {
   while (*s) {
     char now = (int)*s;
     if (now == c) {
@@ -154,7 +154,7 @@ char* strstr(const char* s1, const char* s2) {
   return nullptr;
 }
 
-inline size_t strlen(const char* s) {
+size_t strlen(const char* s) {
   size_t len = 0;
   while (*s++) {
     ++len;
@@ -166,7 +166,7 @@ inline int strcmp(const char* s1, const char* s2) {
   return strncmp(s1, s2, (size_t)-1);
 }
 
-inline int strncmp(const char* s1, const char* s2, size_t count) {
+int strncmp(const char* s1, const char* s2, size_t count) {
   size_t now_count = 0;
   while (now_count++ < count && *s1 && (*s1 == *s2)) {
     ++s1;
@@ -179,7 +179,7 @@ inline char* strcpy(char* s1, const char* s2) {
   return strncpy(s1, s2, (size_t)-1);
 }
 
-inline char* strncpy(char* s1, const char* s2, size_t count) {
+char* strncpy(char* s1, const char* s2, size_t count) {
   size_t now_count = 0;
   char* p = s1;
   while (now_count++ < count && *s2) {
@@ -192,7 +192,7 @@ inline char* strcat(char* s1, const char* s2) {
   return strncat(s1, s2, (size_t)-1);
 }
 
-inline char* strncat(char* s1, const char* s2, size_t count) {
+char* strncat(char* s1, const char* s2, size_t count) {
   size_t s1_length = strlen(s1), now_count = 0;
   char* p = s1 + s1_length;
   while (now_count++ < count && *p) {
@@ -205,7 +205,7 @@ inline char* ReverseString(char* s) {
   return ReverseStringWithIdx(s, 0, strlen(s));
 }
 
-inline char* ReverseStringWithIdx(char* s, size_t start, size_t end) {
+char* ReverseStringWithIdx(char* s, size_t start, size_t end) {
   for (size_t i = 0; i < (end - start) / 2; ++i) {
     const size_t target_idx = end - i - 1;
     const char t = s[start + i];
@@ -275,6 +275,13 @@ int64 Int64FromDecimalString(const char* decimal) {
   return sign * ret;
 }
 
+uint64 Uint64FromHexString(const char* hex) {
+  return (uint64)Int64FromHexString(hex);
+}
+inline uint64 Uint64FromDecimalString(const char* decimal) {
+  return (uint64)Int64FromDecimalString(decimal);
+}
+
 inline size_t HexStringFromInt32(int32 decimal, char* buffer) {
   return HexStringFromInt64((int64)decimal, buffer);
 }
@@ -294,14 +301,18 @@ size_t HexStringFromInt64(int64 decimal, char* buffer) {
   buffer[start_idx++] = 'x';
 
   size_t idx = start_idx;
-  while (decimal) {
-    uint8 now_val = decimal % 0x10;
-    if (now_val < 0xA) {
-      buffer[idx++] = '0' + now_val;
-    } else {
-      buffer[idx++] = 'A' - 10 + now_val;
+  if (!decimal) {
+    buffer[idx++] = '0';
+  } else {
+    while (decimal) {
+      uint8 now_val = decimal % 0x10;
+      if (now_val < 0xA) {
+        buffer[idx++] = '0' + now_val;
+      } else {
+        buffer[idx++] = 'A' - 10 + now_val;
+      }
+      decimal /= 0x10;
     }
-    decimal /= 0x10;
   }
   buffer[idx] = 0;
 
@@ -319,9 +330,58 @@ size_t DecimalStringFromInt64(int64 decimal, char* buffer) {
   }
 
   size_t idx = start_idx;
-  while (decimal) {
-    buffer[idx++] = '0' + (decimal % 10);
-    decimal /= 10;
+  if (!decimal) {
+    buffer[idx++] = '0';
+  } else {
+    while (decimal) {
+      buffer[idx++] = '0' + (decimal % 10);
+      decimal /= 10;
+    }
+  }
+  buffer[idx] = 0;
+
+  ReverseStringWithIdx(buffer, start_idx, idx);
+
+  return idx;
+}
+
+size_t HexStringFromUint64(uint64 decimal, char* buffer) {
+  size_t start_idx = 0;
+
+  buffer[start_idx++] = '0';
+  buffer[start_idx++] = 'x';
+
+  size_t idx = start_idx;
+  if (!decimal) {
+    buffer[idx++] = '0';
+  } else {
+    while (decimal) {
+      uint8 now_val = decimal % 0x10;
+      if (now_val < 0xA) {
+        buffer[idx++] = '0' + now_val;
+      } else {
+        buffer[idx++] = 'A' - 10 + now_val;
+      }
+      decimal /= 0x10;
+    }
+  }
+  buffer[idx] = 0;
+
+  ReverseStringWithIdx(buffer, start_idx, idx);
+
+  return idx;
+}
+size_t DecimalStringFromUint64(uint64 decimal, char* buffer) {
+  size_t start_idx = 0;
+
+  size_t idx = start_idx;
+  if (!decimal) {
+    buffer[idx++] = '0';
+  } else {
+    while (decimal) {
+      buffer[idx++] = '0' + (decimal % 10);
+      decimal /= 10;
+    }
   }
   buffer[idx] = 0;
 
@@ -340,7 +400,7 @@ inline size_t itoa_with_radix(int32 i, char* buffer, int radix) {
 
 size_t ltoa(int64 l, char* buffer) { return ltoa_with_radix(l, buffer, 10); }
 
-inline size_t ltoa_with_radix(int64 l, char* buffer, int radix) {
+size_t ltoa_with_radix(int64 l, char* buffer, int radix) {
   switch (radix) {
     case 16:
       return HexStringFromInt64(l, buffer);
@@ -358,7 +418,7 @@ inline int32 atoi_with_radix(const char* s, int radix) {
 
 inline int64 atol(const char* s) { return atol_with_radix(s, 10); }
 
-inline int64 atol_with_radix(const char* s, int radix) {
+int64 atol_with_radix(const char* s, int radix) {
   switch (radix) {
     case 16:
       return Int64FromHexString(s);

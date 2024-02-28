@@ -177,13 +177,13 @@ inline bool kIsInputBufferFull(void) {
   return IS_BIT_SET(GET_PORT_STATUS(), 1);
 }
 
-inline void kClearOutputPortByte(void) {
+void kClearOutputPortByte(void) {
   while (!kIsOutputBufferFull())
     ;
 }
 
-#define SET_PORT_DATA(data) kSetPortByte(0x60, data)
-#define SEND_COMMAND(cmd) kSetPortByte(0x64, cmd)
+#define SET_PORT_DATA(data) kSetPortByte(0x60, (data))
+#define SEND_COMMAND(cmd) kSetPortByte(0x64, (cmd))
 bool kActivateKeyboard(void) {
   bool previous_interrupt_status = kIsInterruptEnabled();
   kSetInterruptFlag(false);
