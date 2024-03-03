@@ -1,8 +1,35 @@
-#include "ISR.h"
+#include "Task.h"
 
+#include "Descriptor.h"
+#include "Macro.h"
+#include "Memory.h"
+#include "Types.h"
+
+void kSetUpTask(TaskControlBlock* tcb, uint64 id, uint64 flags,
+                uint64 entry_point_addr, void* stack_addr, uint64 stack_size) {
+  memset(tcb->reg_context, 0, sizeof(tcb->reg_context));
+  tcb->context.rsp = (uint64)stack_addr + stack_size;
+  tcb->context.rbp = (uint64)stack_addr + stack_size;
+
+  tcb->context.cs = GDT_KERNEL_CODE_SEGMENT;
+  tcb->context.ds = GDT_KERNEL_DATA_SEGMENT;
+  tcb->context.es = GDT_KERNEL_DATA_SEGMENT;
+  tcb->context.fs = GDT_KERNEL_DATA_SEGMENT;
+  tcb->context.gs = GDT_KERNEL_DATA_SEGMENT;
+  tcb->context.ss = GDT_KERNEL_DATA_SEGMENT;
+
+  tcb->context.rip = entry_point_addr;
+
+  // Set IF(9)bit.
+  tcb->context.rflags |= BIT(9);
+
+  tcb->id = id;
+  tcb->stack_addr = stack_addr;
+  tcb->stack_size = stack_size;
+  tcb->flags = flags;
+}
 #define SAVE_CONTEXT_STRING \
   "push rbp;"               \
-  "mov rbp, rsp;"           \
   "push rax;"               \
   "push rbx;"               \
   "push rcx;"               \
@@ -24,15 +51,6 @@
   "push fs;"                \
   "push gs;"
 #define SAVE_CONTEXT() asm volatile(SAVE_CONTEXT_STRING ::)
-
-#define SWITCH_CONTEXT_STRING                         \
-  "mov ax, 0x10;" /* Kernel Data Segment Descriptor*/ \
-  "mov ds, ax;"                                       \
-  "mov es, ax;"                                       \
-  "mov gs, ax;"                                       \
-  "mov fs, ax;"
-#define SWITCH_CONTEXT() asm volatile(SWITCH_CONTEXT_STRING::)
-
 #define LOAD_CONTEXT_STRING \
   "pop gs;"                 \
   "pop fs;"                 \
@@ -59,7 +77,5 @@
 
 #undef SAVE_CONTEXT_STRING
 #undef SAVE_CONTEXT
-#undef SWITCH_CONTEXT_STRING
-#undef SWITCH_CONTEXT
 #undef LOAD_CONTEXT_STRING
 #undef LOAD_CONTEXT

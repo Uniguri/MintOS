@@ -9,6 +9,7 @@
 #include "PIT.h"
 #include "RTC.h"
 #include "String.h"
+#include "Task.h"
 
 ShellCommandEntry command_table[] = {
     {"help", "Show Help", kHelp},
@@ -20,6 +21,7 @@ ShellCommandEntry command_table[] = {
     {"rdtsc", "Read Time Stamp Counter", kPrintTimeStampCounter},
     {"date", "Show Date", kShowDate},
     {"time", "Show Time", kShowTime},
+    {"createtask", "Create Task", kCreateTestTask},
 };
 
 void kStartConsoleShell(void) {
@@ -229,6 +231,42 @@ void kShowTime(const char* parameter_buffer) {
   kReadRTCDate(&year, &month, &day_of_month, &day_of_week);
 
   printf("%d:%d:%d\n", hour, min, sec);
+}
+
+static TaskControlBlock task[2] = {
+    0,
+};
+static uint64 stack[1024] = {
+    0,
+};
+
+void kTestTask(void) {
+  int i = 0;
+  while (1) {
+    printf(
+        "[%d] This message is from kTestTask. Press any key to switch "
+        "kConsoleShell\n",
+        i++);
+    getch();
+
+    kSwitchContext(&task[1].context, &task[0].context);
+  }
+}
+
+void kCreateTestTask(const char* parameter_buffer) {
+  kSetUpTask(&task[1], 1, 0, (uint64)kTestTask, stack, sizeof(stack));
+
+  int i = 0;
+  while (1) {
+    printf(
+        "[%d] This message is from kConsoleShell. Press any key to switch "
+        "TestTask~!!\n",
+        i++);
+    if (getch() == 'q') {
+      break;
+    }
+    kSwitchContext(&task[0].context, &task[1].context);
+  }
 }
 
 #undef MAKE_LIST_AND_PARAM

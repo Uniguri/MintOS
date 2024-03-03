@@ -36,5 +36,6 @@ void kWaitUsingPIT(const char* parameter_buffer);
 void kPrintTimeStampCounter(const char* parameter_buffer);
 void kShowDate(const char* parameter_buffer);
 void kShowTime(const char* parameter_buffer);
+void kCreateTestTask(const char* parameter_buffer);
 
 #endif
