@@ -239,7 +239,7 @@ void kTestTask1(void) {
 
   uint8 data = 0;
   uint32 margin = (running_task->link.id & 0xFFFFFFFF) % 10;
-  uint32 i = 0, x = 0, y = 0;
+  int i = 0, x = 0, y = 0;
   while (1) {
     switch (i) {
       case 0:
@@ -248,7 +248,7 @@ void kTestTask1(void) {
         }
         break;
       case 1:
-        if (++y >= (CONSOLE_WIDTH - margin)) {
+        if (++y >= (CONSOLE_HEIGHT - margin)) {
           i = 2;
         }
         break;
