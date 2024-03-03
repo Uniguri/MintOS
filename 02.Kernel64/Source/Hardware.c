@@ -13,7 +13,6 @@ inline uint8 kGetPortByte(uint16 port) {
 }
 
 inline void kSetPortByte(uint16 port, uint8 data) {
-  uint16 p = port, d = data;
   asm volatile(
       // Set data on port.
       "out dx, al\n"

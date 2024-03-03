@@ -1,6 +1,8 @@
 #ifndef MINTOS_TASK_H_
 #define MINTOS_TASK_H_
 
+#include "List.h"
+#include "Macro.h"
 #include "Types.h"
 
 #define TASK_REGISTER_COUNT (24)
@@ -29,6 +31,14 @@
 #define TASK_RFLAGS_OFFSET (21)
 #define TASK_RSP_OFFSET (22)
 #define TASK_SS_OFFSET (23)
+
+#define TASK_TCB_POOL_ADDRESS (BYTE_FROM_MB(8))
+#define TASK_MAX_COUNT (1024)
+#define TASK_STACK_POOL_ADDRESS \
+  (TASK_TCB_POOL_ADDRESS + sizeof(TaskControlBlock) + TASK_MAX_COUNT)
+#define TASK_STACK_SIZE (BYTE_FROM_KB(8))
+#define TASK_INVALID_ID (0xFFFFFFFFFFFFFFFFu)
+#define TASK_PROCESSOR_TIME (5)
 
 #pragma pack(push, 1)
 typedef struct kContextStruct {
@@ -59,22 +69,48 @@ typedef struct kContextStruct {
 } Context;
 
 typedef struct kTaskControlBlockStruct {
+  ListLink link;
+  uint64 flags;
+
   union {
     Context context;
     uint64 reg_context[TASK_REGISTER_COUNT];
   };
 
-  uint64 id;
-  uint64 flags;
-
   void* stack_addr;
   uint64 stack_size;
 } TaskControlBlock;
 
+typedef struct kTCBPollManagerStruct {
+  TaskControlBlock* start_addr;
+  size_t max_count;
+  size_t use_count;
+  size_t alloacted_count;
+} TCBPoolManager;
+
+typedef struct kSchedulerStruct {
+  TaskControlBlock* running_task;
+  uint32 processor_time;
+  List ready_list;
+} Scheduler;
 #pragma pack(pop)
 
-void kSetUpTask(TaskControlBlock* tcb, uint64 id, uint64 flags,
-                uint64 entry_point_addr, void* stack_addr, uint64 stack_size);
+void kInitializeTCBPool(void);
+TaskControlBlock* kAllocateTCB(void);
+void kFreeTCB(uint64 id);
+TaskControlBlock* kCreateTask(uint64 flags, uint64 entry_point_addr);
+void kSetUpTask(TaskControlBlock* tcb, uint64 flags, uint64 entry_point_addr,
+                void* stack_addr, uint64 stack_size);
+
+void kInitializeScheduler(void);
+void kSetRunningTask(TaskControlBlock* task);
+TaskControlBlock* kGetRunningTask(void);
+TaskControlBlock* kGetNextTaskToRun(void);
+void kAddTaskToReadyList(TaskControlBlock* task);
+void kSchedule(void);
+bool kScheduleInInterrupt(void);
+void kDecreaseProcessorTime(void);
+bool kIsProcessorTimeExpired(void);
 
 void kSwitchContext(Context* current_context, Context* next_context);
 

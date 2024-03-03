@@ -27,5 +27,5 @@ inline void kWaitUsingDirectPIT(uint16 count) {
   uint16 current_counter0;
   do {
     current_counter0 = kReadCounter0();
-  } while ((last_counter0 - current_counter0) & 0xFFFF < count);
+  } while (((last_counter0 - current_counter0) & 0xFFFF) < count);
 }

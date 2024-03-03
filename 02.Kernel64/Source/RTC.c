@@ -10,8 +10,6 @@
     RTC_BCD_TO_BIN(data);                               \
   })
 void kReadRTCTime(uint8* hour, uint8* minute, uint8* second) {
-  uint8 data;
-
   *hour = GET_DATA_AND_CONVERT_BIN(HOUR);
   *minute = GET_DATA_AND_CONVERT_BIN(MINUTE);
   *second = GET_DATA_AND_CONVERT_BIN(SECOND);

@@ -44,6 +44,7 @@ size_t kCalculateRamSize(void) {
 #undef TEST_VALUE
 
   ram_size = MB_FROM_BYTE((size_t)addr);
+  return ram_size;
 }
 
 inline size_t kGetRamSize(void) { return ram_size; }

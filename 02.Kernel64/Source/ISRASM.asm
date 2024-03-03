@@ -8,6 +8,8 @@ extern kCommonExceptionHandler
 extern kCommonInterruptHandler
 ; void kKeyboardHandler(int vector_number)
 extern kKeyboardHandler
+; void kTimerHandler(int vector_number)
+extern kTimerHandler
 
 ; ISR(Interrupt Service Routin) for Exception.
 global kISRDivideError, kISRDebug, kISRNMI, kISRBreakPoint, kISROverflow
@@ -348,7 +350,7 @@ kISRTimer:
 
     ; Call handler with interrupt number
     mov rdi, 32
-    call kCommonInterruptHandler
+    call kTimerHandler
 
     LOAD_CONTEXT
     iretq

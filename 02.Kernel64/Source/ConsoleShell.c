@@ -233,39 +233,101 @@ void kShowTime(const char* parameter_buffer) {
   printf("%d:%d:%d\n", hour, min, sec);
 }
 
-static TaskControlBlock task[2] = {
-    0,
-};
-static uint64 stack[1024] = {
-    0,
-};
+void kTestTask1(void) {
+  Character* screen = (Character*)CONSOLE_VIDEO_MEMORY_ADDRESS;
+  TaskControlBlock* running_task = kGetRunningTask();
 
-void kTestTask(void) {
-  int i = 0;
+  uint8 data = 0;
+  uint32 margin = (running_task->link.id & 0xFFFFFFFF) % 10;
+  uint32 i = 0, x = 0, y = 0;
   while (1) {
-    printf(
-        "[%d] This message is from kTestTask. Press any key to switch "
-        "kConsoleShell\n",
-        i++);
-    getch();
+    switch (i) {
+      case 0:
+        if (++x >= (CONSOLE_WIDTH - margin)) {
+          i = 1;
+        }
+        break;
+      case 1:
+        if (++y >= (CONSOLE_WIDTH - margin)) {
+          i = 2;
+        }
+        break;
+      case 2:
+        if (--x < margin) {
+          i = 3;
+        }
+        break;
+      case 3:
+        if (--y < margin) {
+          i = 0;
+        }
+        break;
+    }
 
-    kSwitchContext(&task[1].context, &task[0].context);
+    screen[y * CONSOLE_WIDTH + x].charactor = data;
+    screen[y * CONSOLE_WIDTH + x].attribute = data & 0x0F;
+    ++data;
+
+    kSchedule();
+  }
+}
+
+void kTestTask2(void) {
+  Character* screen = (Character*)CONSOLE_VIDEO_MEMORY_ADDRESS;
+  TaskControlBlock* running_task = kGetRunningTask();
+  const char data[4] = {'-', '\\', '|', '/'};
+
+  uint32 offset = (running_task->link.id & 0xFFFFFFFF) * 2;
+  offset = CONSOLE_WIDTH * CONSOLE_HEIGHT -
+           (offset % (CONSOLE_WIDTH * CONSOLE_HEIGHT));
+
+  uint32 i = 0;
+  while (1) {
+    screen[offset].charactor = data[i % 4];
+    screen[offset].attribute = (offset % 15) + 1;
+    ++i;
+
+    kSchedule();
   }
 }
 
 void kCreateTestTask(const char* parameter_buffer) {
-  kSetUpTask(&task[1], 1, 0, (uint64)kTestTask, stack, sizeof(stack));
+  MAKE_LIST_AND_PARAM(parameter_buffer);
 
-  int i = 0;
-  while (1) {
-    printf(
-        "[%d] This message is from kConsoleShell. Press any key to switch "
-        "TestTask~!!\n",
-        i++);
-    if (getch() == 'q') {
+  if (!GET_NEXT_PARAM()) {
+    printf("Usage: createtask [type; 1 or 2] [count]\n");
+    return;
+  }
+  uint64 type = Int64FromDecimalString(param);
+
+  if (!GET_NEXT_PARAM()) {
+    printf("Usage: createtask [type; 1 or 2] [count]\n");
+    return;
+  }
+  uint64 count = Int64FromDecimalString(param);
+
+  switch (type) {
+    case 1: {
+      int i;
+      for (i = 0; i < count; ++i) {
+        if (!kCreateTask(0, (uint64)kTestTask1)) {
+          break;
+        }
+      }
       break;
     }
-    kSwitchContext(&task[0].context, &task[1].context);
+    case 2: {
+      int i;
+      for (i = 0; i < count; ++i) {
+        if (!kCreateTask(0, (uint64)kTestTask2)) {
+          break;
+        }
+      }
+      break;
+    }
+    default:
+      printf("Invalid type\n");
+      break;
   }
 }
 

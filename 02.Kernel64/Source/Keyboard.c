@@ -231,8 +231,6 @@ inline uint8 kGetKeyboardScanCode(void) {
 
 #define GET_DOWN_CODE(code) (code & 0x7F)
 bool kIsUseCombinedCode(const uint8 scan_code) {
-  const uint8 down_scan_code = GET_DOWN_CODE(scan_code);
-
   if (kIsAlphabetScanCode(scan_code)) {
     // Alphabet is affected by SHT, CAPS.
     return keyboard_manager.shift_down ^ keyboard_manager.caps_lock_on;

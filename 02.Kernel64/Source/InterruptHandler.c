@@ -3,6 +3,8 @@
 #include "Console.h"
 #include "Keyboard.h"
 #include "PIC.h"
+#include "Task.h"
+#include "Tick.h"
 
 void kCommonExceptionHandler(int vector_number, uint64 error_code) {
 #define DO_STUCT_IF(x) while ((x))
@@ -22,6 +24,7 @@ void kCommonExceptionHandler(int vector_number, uint64 error_code) {
   DO_STUCT_IF(1);
 #undef DO_STUCT_IF
 }
+
 void kCommonInterruptHandler(int vector_number) {
   char buffer[] = "[INT:  , ]";
   static int common_interrupt_count = 0;
@@ -51,4 +54,24 @@ void kKeyboardHandler(int vector_number) {
   }
 
   kSendEOIToPIC(vector_number - PIC_IRQ_START_VECTOR);
+}
+
+void kTimerHandler(int vector_number) {
+  char buffer[] = "[INT:  , ]";
+  static int timer_interrupt_count = 0;
+
+  buffer[5] = '0' + vector_number / 10;
+  buffer[6] = '0' + vector_number % 10;
+  buffer[8] = '0' + timer_interrupt_count;
+  timer_interrupt_count = (timer_interrupt_count + 1) % 10;
+  kPrintStringXY(70, 0, buffer);
+
+  kSendEOIToPIC(vector_number - PIC_IRQ_START_VECTOR);
+
+  ++tick_count;
+
+  kDecreaseProcessorTime();
+  if (kIsProcessorTimeExpired()) {
+    kScheduleInInterrupt();
+  }
 }

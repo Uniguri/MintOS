@@ -5,6 +5,8 @@
 #include "Keyboard.h"
 #include "Memory.h"
 #include "PIC.h"
+#include "PIT.h"
+#include "Task.h"
 #include "Types.h"
 
 void Main(void) {
@@ -37,6 +39,11 @@ void Main(void) {
   kCalculateRamSize();
   kSetCursor(45, cursor_y++);
   printf("Pass], Size = %d MB\n", kGetRamSize());
+
+  printf("TCB Pool And Scheduler Initialize...........[Pass]\n");
+  ++cursor_y;
+  kInitializeScheduler();
+  kInitializePIT(MILLISEC_TO_COUNT(1), 1);
 
   printf("Keyboard Activate And Queue Initialize......[    ]");
   kSetCursor(45, cursor_y++);

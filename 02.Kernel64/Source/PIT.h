@@ -3,9 +3,9 @@
 
 #include "Types.h"
 
-#define PIT_FREQUENCY (1193182u)
-#define MILLISEC_TO_COUNT(x) (PIT_FREQUENCY * (x) / 1000u)
-#define MICROSEC_TO_COUNT(x) (PIT_FREQUENCY * (x) / 1000000u)
+#define PIT_FREQUENCY (1193182llu)
+#define MILLISEC_TO_COUNT(x) (PIT_FREQUENCY * (x) / 1000llu)
+#define MICROSEC_TO_COUNT(x) (PIT_FREQUENCY * (x) / 1000000llu)
 
 #define PIT_PORT_CONTROL (0x43)
 #define PIT_PORT_COUNTER0 (0x40)
