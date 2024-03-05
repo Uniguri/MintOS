@@ -19,9 +19,19 @@ typedef struct kListManagerStruct {
 void kInitializeList(List* list);
 size_t kGetListCount(const List* list);
 void kAddListToTail(List* list, void* item);
-void kAddListToHeader(List* list, void* item);
+void kAddListToHead(List* list, void* item);
+// Remove element with id from list.
+// @param list: pointer to list.
+// @id: id to remove element.
+// @return valid pointer if success to remove. If fail, return nullptr.
 void* kRemoveList(List* list, uint64 id);
-void* kRemoveListFromHeader(List* list);
+// Remove head element from list.
+// @param list: pointer to list.
+// @return valid pointer if success to remove. If fail, return nullptr.
+void* kRemoveListFromHead(List* list);
+// Remove tail element from list.
+// @param list: pointer to list.
+// @return valid pointer if success to remove. If fail, return nullptr.
 void* kRemoveListFromTail(List* list);
 void* kFindList(const List* list, uint64 id);
 void* kkGetHeaderFromList(const List* list);

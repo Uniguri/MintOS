@@ -6,6 +6,7 @@
 #include "Keyboard.h"
 #include "Memory.h"
 #include "String.h"
+#include "Task.h"
 #include "Types.h"
 
 ConsoleManager console_manager = {
@@ -91,8 +92,9 @@ void kClearScreen(void) {
 uint8 getch(void) {
   while (1) {
     KeyData key_data;
-    while (!kGetKeyFromKeyQueue(&key_data))
-      ;
+    while (!kGetKeyFromKeyQueue(&key_data)) {
+      // kSchedule();
+    }
     if (key_data.flag == kFlagDown) {
       return key_data.ascii_code;
     }

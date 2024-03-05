@@ -28,7 +28,7 @@ void kAddListToTail(List* list, void* item) {
   ++list->item_count;
 }
 
-void kAddListToHeader(List* list, void* item) {
+void kAddListToHead(List* list, void* item) {
   ListLink* link = (ListLink*)item;
   link->next = list->head;
 
@@ -70,7 +70,7 @@ void* kRemoveList(List* list, uint64 id) {
   return nullptr;
 }
 
-inline void* kRemoveListFromHeader(List* list) {
+inline void* kRemoveListFromHead(List* list) {
   if (!list->item_count) {
     return nullptr;
   }

@@ -4,6 +4,7 @@
 #include "Interrupt.h"
 #include "Macro.h"
 #include "Memory.h"
+#include "Tick.h"
 #include "Types.h"
 
 static Scheduler scheduler;
@@ -12,16 +13,16 @@ static TCBPoolManager tcb_pool_manager;
 void kInitializeTCBPool(void) {
   memset(&tcb_pool_manager, 0, sizeof(TCBPoolManager));
 
-  tcb_pool_manager.start_addr = (TaskControlBlock*)TASK_TCB_POOL_ADDRESS;
+  tcb_pool_manager.tcb = (TaskControlBlock*)TASK_TCB_POOL_ADDRESS;
   memset((void*)TASK_TCB_POOL_ADDRESS, 0,
          sizeof(TaskControlBlock) * TASK_MAX_COUNT);
 
   for (uint64 i = 0; i < TASK_MAX_COUNT; ++i) {
-    tcb_pool_manager.start_addr[i].link.id = i;
+    tcb_pool_manager.tcb[i].link.id = i;
   }
 
   tcb_pool_manager.max_count = TASK_MAX_COUNT;
-  tcb_pool_manager.alloacted_count = 0;
+  tcb_pool_manager.alloacted_count = 1;
 }
 
 TaskControlBlock* kAllocateTCB(void) {
@@ -32,8 +33,8 @@ TaskControlBlock* kAllocateTCB(void) {
   TaskControlBlock* tcb;
   uint64 id;
   for (uint64 i = 0; i < tcb_pool_manager.max_count; ++i) {
-    if (!IS_BIT_SET(tcb_pool_manager.start_addr[i].link.id, 32)) {
-      tcb = &tcb_pool_manager.start_addr[i];
+    if (!IS_BIT_SET(tcb_pool_manager.tcb[i].link.id, 32)) {
+      tcb = &tcb_pool_manager.tcb[i];
       id = tcb->link.id;
       break;
     }
@@ -51,8 +52,8 @@ TaskControlBlock* kAllocateTCB(void) {
 
 void kFreeTCB(uint64 id) {
   uint64 i = id & 0xFFFFFFFF;
-  memset(&tcb_pool_manager.start_addr[i], 0, sizeof(Context));
-  tcb_pool_manager.start_addr[i].link.id = i;
+  memset(&tcb_pool_manager.tcb[i], 0, sizeof(Context));
+  tcb_pool_manager.tcb[i].link.id = i;
   --tcb_pool_manager.use_count;
 }
 
@@ -61,9 +62,9 @@ TaskControlBlock* kCreateTask(uint64 flags, uint64 entry_point_addr) {
   if (!task) {
     return nullptr;
   }
-
-  void* stack_addr = (void*)(TASK_STACK_POOL_ADDRESS +
-                             TASK_STACK_SIZE * (task->link.id & 0xFFFFFFFF));
+  void* stack_addr =
+      (void*)(TASK_STACK_POOL_ADDRESS +
+              TASK_STACK_SIZE * GET_TCB_OFFSET_FROM_ID(task->link.id));
   kSetUpTask(task, flags, entry_point_addr, stack_addr, TASK_STACK_SIZE);
   kAddTaskToReadyList(task);
   return task;
@@ -92,10 +93,21 @@ void kSetUpTask(TaskControlBlock* tcb, uint64 flags, uint64 entry_point_addr,
   tcb->flags = flags;
 }
 
-inline void kInitializeScheduler(void) {
+void kInitializeScheduler(void) {
   kInitializeTCBPool();
-  kInitializeList(&scheduler.ready_list);
+
+  for (int i = 0; i < kTaskNumberOfPriority; ++i) {
+    kInitializeList(&scheduler.task_to_run_list[i]);
+    scheduler.execute_count[i] = 0;
+  }
+  kInitializeList(&scheduler.task_to_end_list);
+
+  // Set console shell task.
   scheduler.running_task = kAllocateTCB();
+  SET_TASK_PRIORITY(scheduler.running_task, kTaskPriorityHighest);
+
+  scheduler.processor_load = 0;
+  scheduler.spend_processor_time_ind_idle_task = 0;
 }
 
 inline void kSetRunningTask(TaskControlBlock* task) {
@@ -106,23 +118,40 @@ inline TaskControlBlock* kGetRunningTask(void) {
   return scheduler.running_task;
 }
 
-inline TaskControlBlock* kGetNextTaskToRun(void) {
-  if (!kGetListCount(&scheduler.ready_list)) {
-    return nullptr;
+TaskControlBlock* kGetNextTaskToRun(void) {
+  TaskControlBlock* target = nullptr;
+  for (int i = 0; !target && i < 2; ++i) {
+    for (int j = 0; j < kTaskNumberOfPriority; ++j) {
+      int task_count = kGetListCount(&scheduler.task_to_run_list[j]);
+      if (scheduler.execute_count[j] < task_count) {
+        target = (TaskControlBlock*)kRemoveListFromHead(
+            &scheduler.task_to_run_list[j]);
+        ++scheduler.execute_count[j];
+        break;
+      } else {
+        scheduler.execute_count[j] = 0;
+      }
+    }
   }
-  return (TaskControlBlock*)kRemoveListFromHeader(&scheduler.ready_list);
+
+  return target;
 }
 
-inline void kAddTaskToReadyList(TaskControlBlock* task) {
-  kAddListToTail(&scheduler.ready_list, task);
+inline bool kAddTaskToReadyList(TaskControlBlock* task) {
+  int task_priority = GET_TASK_PRIORITY(task);
+  if (task_priority >= kTaskNumberOfPriority) {
+    return false;
+  }
+  kAddListToTail(&scheduler.task_to_run_list[task_priority], task);
+  return true;
 }
 
 void kSchedule(void) {
-  if (!kGetListCount(&scheduler.ready_list)) {
+  if (!kGetReadyTaskCount()) {
     return;
   }
 
-  bool prev_flag = kIsInterruptEnabled();
+  const bool prev_flag = kIsInterruptEnabled();
   kSetInterruptFlag(false);
 
   TaskControlBlock* next_task = kGetNextTaskToRun();
@@ -131,11 +160,25 @@ void kSchedule(void) {
     return;
   }
 
-  TaskControlBlock* running_tast = scheduler.running_task;
-  kAddTaskToReadyList(running_tast);
+  // Set to run next_task.
+  TaskControlBlock* prev_task = scheduler.running_task;
+  TaskControlBlock* task_to_run = scheduler.running_task = next_task;
 
-  scheduler.running_task = next_task;
-  kSwitchContext(&running_tast->context, &next_task->context);
+  // If prev task is idle task, increase idle time.
+  if (prev_task->flags & TASK_FLAG_IDLE) {
+    scheduler.spend_processor_time_ind_idle_task +=
+        TASK_PROCESSOR_TIME - scheduler.processor_time;
+  }
+
+  // If prev task is to end, we don't need to save context of prev task (current
+  // context).
+  if (prev_task->flags & TASK_FLAG_END_TASK) {
+    kAddListToTail(&scheduler.task_to_end_list, prev_task);
+    kSwitchContext(nullptr, &task_to_run->context);
+  } else {
+    kAddTaskToReadyList(prev_task);
+    kSwitchContext(&prev_task->context, &task_to_run->context);
+  }
 
   scheduler.processor_time = TASK_PROCESSOR_TIME;
   kSetInterruptFlag(prev_flag);
@@ -146,17 +189,31 @@ bool kScheduleInInterrupt(void) {
   if (!next_task) {
     return false;
   }
-  // printf("next_task = %p, %d\n", next_task,
-  //        kGetListCount(&scheduler.ready_list));
 
-  char* context_addr = (char*)IST_START_ADDRESS + IST_SIZE - sizeof(Context);
+  // address for saved context in interrupt handlers.
+  char* ist_context_addr =
+      (char*)IST_START_ADDRESS + IST_SIZE - sizeof(Context);
 
-  TaskControlBlock* running_task = scheduler.running_task;
-  memcpy(&running_task->context, context_addr, sizeof(Context));
-  kAddTaskToReadyList(running_task);
+  // Set to run next_task.
+  TaskControlBlock* prev_task = scheduler.running_task;
+  TaskControlBlock* task_to_run = scheduler.running_task = next_task;
 
-  scheduler.running_task = next_task;
-  memcpy(context_addr, &next_task->context, sizeof(Context));
+  // If prev task is idle task, increase idle time.
+  if (prev_task->flags & TASK_FLAG_IDLE) {
+    scheduler.spend_processor_time_ind_idle_task += TASK_PROCESSOR_TIME;
+  }
+
+  // If prev task is to end, we don't need to save context of prev task (current
+  // context).
+  if (prev_task->flags & TASK_FLAG_END_TASK) {
+    kAddListToTail(&scheduler.task_to_end_list, prev_task);
+  } else {
+    // Save ist context in prev_task.
+    memcpy(&prev_task->context, ist_context_addr, sizeof(Context));
+    kAddTaskToReadyList(prev_task);
+  }
+  // Switch context by copying.
+  memcpy(ist_context_addr, &task_to_run->context, sizeof(Context));
 
   scheduler.processor_time = TASK_PROCESSOR_TIME;
   return true;
@@ -170,6 +227,169 @@ inline void kDecreaseProcessorTime(void) {
 
 inline bool kIsProcessorTimeExpired(void) {
   return scheduler.processor_time <= 0;
+}
+
+TaskControlBlock* kRemoveTaskFromReadyList(uint64 id) {
+  uint64 tcb_offset = GET_TCB_OFFSET_FROM_ID(id);
+  if (tcb_offset >= TASK_MAX_COUNT) {
+    return nullptr;
+  }
+
+  TaskControlBlock* target = &tcb_pool_manager.tcb[tcb_offset];
+  if (target->link.id != id) {
+    return nullptr;
+  }
+
+  enum TaskPriority priority = GET_TASK_PRIORITY(target);
+  target = kRemoveList(&scheduler.task_to_run_list[priority], id);
+  return target;
+}
+
+bool kChangeTaskPriority(uint64 id, enum TaskPriority priority) {
+  if (priority >= kTaskNumberOfPriority) {
+    return false;
+  }
+
+  // When task is running task, only change priority.
+  TaskControlBlock* target = scheduler.running_task;
+  if (target->link.id == id) {
+    SET_TASK_PRIORITY(target, priority);
+    return true;
+  }
+
+  // When task is in ready list, remove it from list and change priority, push
+  // it to list.
+  target = kRemoveTaskFromReadyList(id);
+  if (target) {
+    SET_TASK_PRIORITY(target, priority);
+    kAddTaskToReadyList(target);
+    return true;
+  }
+
+  // If task is not in ready list, find it on TCB pool.
+  target = kGetTCBInTCBPool(GET_TCB_OFFSET_FROM_ID(id));
+  if (target) {
+    SET_TASK_PRIORITY(target, priority);
+    return true;
+  }
+
+  return false;
+}
+
+bool kEndTask(uint64 id) {
+  TaskControlBlock* target = scheduler.running_task;
+  // When need to end current running task.
+  if (target->link.id == id) {
+    target->flags |= TASK_FLAG_END_TASK;
+    SET_TASK_PRIORITY(target, kTaskPriorityWait);
+
+    kSchedule();
+
+    // Below codes are never executed.
+    while (1)
+      ;
+  }
+  // When need to find task in task_to_run_list.
+  else {
+    target = kRemoveTaskFromReadyList(id);
+    if (target) {
+      target->flags |= TASK_FLAG_END_TASK;
+      SET_TASK_PRIORITY(target, kTaskPriorityWait);
+      kAddListToTail(&scheduler.task_to_end_list, target);
+      return true;
+    }
+
+    // If tasks is not in ready list.
+    target = kGetTCBInTCBPool(GET_TCB_OFFSET_FROM_ID(id));
+    if (target) {
+      target->flags |= TASK_FLAG_END_TASK;
+      SET_TASK_PRIORITY(target, kTaskPriorityWait);
+      kAddListToTail(&scheduler.task_to_end_list, target);
+    }
+    return false;
+  }
+}
+
+inline void kExitTask(void) { kEndTask(scheduler.running_task->link.id); }
+
+inline size_t kGetReadyTaskCount(void) {
+  size_t total_count = 0;
+  for (int i = 0; i < kTaskNumberOfPriority; ++i) {
+    total_count += kGetListCount(&scheduler.task_to_run_list[i]);
+  }
+  return total_count;
+}
+
+inline size_t kGetTaskCount(void) {
+  return kGetReadyTaskCount() + kGetListCount(&scheduler.task_to_end_list) + 1;
+}
+
+inline TaskControlBlock* kGetTCBInTCBPool(uint64 offset) {
+  if (offset > TASK_MAX_COUNT) {
+    return nullptr;
+  }
+  return &tcb_pool_manager.tcb[offset];
+}
+
+inline bool kIsTaskExist(uint64 id) {
+  const TaskControlBlock* tcb = kGetTCBInTCBPool(GET_TCB_OFFSET_FROM_ID(id));
+  return (tcb && tcb->link.id == id);
+}
+
+inline uint64 kGetProcessorLoad(void) { return scheduler.processor_load; }
+
+void kIdleTask(void) {
+  uint64 last_measure_tick = 0, last_spend_tick_in_idle_task = 0;
+  uint64 current_measure_tick, current_spend_tick_in_idle_task;
+  while (1) {
+    current_measure_tick = kGetTickCount();
+    current_spend_tick_in_idle_task =
+        scheduler.spend_processor_time_ind_idle_task;
+
+    const uint64 tick_diff = current_measure_tick - last_measure_tick;
+    const uint64 spend_tick_in_idle_diff =
+        current_spend_tick_in_idle_task - last_spend_tick_in_idle_task;
+    if (tick_diff) {
+      scheduler.processor_load =
+          100 - 100 * spend_tick_in_idle_diff / tick_diff;
+    } else {
+      scheduler.processor_load = 0;
+    }
+
+    last_measure_tick = current_measure_tick;
+    last_spend_tick_in_idle_task = current_spend_tick_in_idle_task;
+
+    kHaltProcessorByLoad();
+
+    while (kGetListCount(&scheduler.task_to_end_list)) {
+      TaskControlBlock* task = kRemoveListFromHead(&scheduler.task_to_end_list);
+      if (task) {
+        kFreeTCB(task->link.id);
+      }
+    }
+
+    kSchedule();
+  }
+}
+
+inline void kHaltProcessor(void) {
+  asm volatile(
+      "hlt;"
+      "hlt;");
+}
+
+void kHaltProcessorByLoad(void) {
+  const uint64 processor_load = scheduler.processor_load;
+  if (processor_load < 40) {
+    kHaltProcessor();
+    kHaltProcessor();
+    kHaltProcessor();
+  } else if (processor_load < 80) {
+    kHaltProcessor();
+    kHaltProcessor();
+  } else if (processor_load < 95) {
+    kHaltProcessor();
+  }
 }
 
 #define SAVE_CONTEXT_STRING \

@@ -5,4 +5,6 @@
 
 extern volatile uint64 tick_count;
 
+uint64 kGetTickCount(void);
+
 #endif

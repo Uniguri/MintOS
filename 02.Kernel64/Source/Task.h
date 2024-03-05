@@ -34,11 +34,28 @@
 
 #define TASK_TCB_POOL_ADDRESS (BYTE_FROM_MB(8))
 #define TASK_MAX_COUNT (1024)
+#define GET_TCB_OFFSET_FROM_ID(id) ((id) & 0xFFFFFFFF)
 #define TASK_STACK_POOL_ADDRESS \
   (TASK_TCB_POOL_ADDRESS + sizeof(TaskControlBlock) * TASK_MAX_COUNT)
 #define TASK_STACK_SIZE (BYTE_FROM_KB(8))
 #define TASK_INVALID_ID (0xFFFFFFFFFFFFFFFFu)
 #define TASK_PROCESSOR_TIME (5)
+
+#define GET_TASK_PRIORITY(task) ((task)->flags & 0xFF)
+#define SET_TASK_PRIORITY(task, priority) \
+  ((task)->flags = ((task)->flags & 0xFFFFFFFFFFFFFF00) | (priority))
+enum TaskPriority {
+  kTaskPriorityHighest = 0,
+  kTaskPriorityHigh,
+  kTaskPriorityMedium,
+  kTaskPriorityLow,
+  kTaskPriorityLowest,
+  kTaskNumberOfPriority,
+  kTaskPriorityWait = 0xFF,
+};
+
+#define TASK_FLAG_END_TASK (BIT(63llu))
+#define TASK_FLAG_IDLE (BIT(59llu))
 
 #pragma pack(push, 1)
 typedef struct kContextStruct {
@@ -82,7 +99,7 @@ typedef struct kTaskControlBlockStruct {
 } TaskControlBlock;
 
 typedef struct kTCBPollManagerStruct {
-  TaskControlBlock* start_addr;
+  TaskControlBlock* tcb;
   size_t max_count;
   size_t use_count;
   size_t alloacted_count;
@@ -91,9 +108,21 @@ typedef struct kTCBPollManagerStruct {
 typedef struct kSchedulerStruct {
   TaskControlBlock* running_task;
   uint32 processor_time;
-  List ready_list;
+
+  List task_to_run_list[kTaskNumberOfPriority];
+  List task_to_end_list;
+  enum TaskPriority execute_count[kTaskNumberOfPriority];
+
+  uint64 processor_load;
+  uint64 spend_processor_time_ind_idle_task;
 } Scheduler;
 #pragma pack(pop)
+
+// save current context on current_context and switch to next_context.
+// Implement in TaskASM.asm
+// @param current_context: pointer to save current_context.
+// @param next_context: pointer to context to switch.
+void kSwitchContext(Context* current_context_or_null, Context* next_context);
 
 void kInitializeTCBPool(void);
 TaskControlBlock* kAllocateTCB(void);
@@ -103,15 +132,49 @@ void kSetUpTask(TaskControlBlock* tcb, uint64 flags, uint64 entry_point_addr,
                 void* stack_addr, uint64 stack_size);
 
 void kInitializeScheduler(void);
+// Set running task.
+// @param task: task to be running task.
 void kSetRunningTask(TaskControlBlock* task);
 TaskControlBlock* kGetRunningTask(void);
 TaskControlBlock* kGetNextTaskToRun(void);
-void kAddTaskToReadyList(TaskControlBlock* task);
+// Add task to list containing tasks to run.
+// @param task: task to add.
+bool kAddTaskToReadyList(TaskControlBlock* task);
+// Do scheduling.
 void kSchedule(void);
+// Do scheduling on interrupt. This function MUST be called
+// when interrupt occurs.
 bool kScheduleInInterrupt(void);
 void kDecreaseProcessorTime(void);
+// Check occupied time of current processor exceed given time.
+// @return True if we need to change task.
 bool kIsProcessorTimeExpired(void);
+// Remove task from ready list(list containing tasks to run) and return it.
+// @param id: id to remove and get.
+// @return pointer to removed tcb from list containing tasks to run.
+TaskControlBlock* kRemoveTaskFromReadyList(uint64 id);
+bool kChangeTaskPriority(uint64 id, enum TaskPriority priority);
+// End specific task.
+// @param id: id of task to end.
+// @return true if success.
+bool kEndTask(uint64 id);
+// End current running task.
+void kExitTask(void);
+// Get the number of tasks to run (tasks in list to run).
+// @return number of tasks to run.
+size_t kGetReadyTaskCount(void);
+// Get the number of all tasks (tasks in list to run and end).
+// @return the number of all tasks.
+size_t kGetTaskCount(void);
+// Get TCB at offset(index) on TCB pool.
+// @param offset: offset(index) of TCB.
+// @return valid pointer if success.
+TaskControlBlock* kGetTCBInTCBPool(uint64 offset);
+bool kIsTaskExist(uint64 id);
+uint64 kGetProcessorLoad(void);
 
-void kSwitchContext(Context* current_context, Context* next_context);
+void kIdleTask(void);
+void kHaltProcessor(void);
+void kHaltProcessorByLoad(void);
 
 #endif

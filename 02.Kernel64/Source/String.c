@@ -118,7 +118,7 @@ inline int toupper(int c) {
 
 char* strchr(const char* s, char c) {
   while (*s) {
-    char now = (int)*s;
+    char now = *s;
     if (now == c) {
       return (char*)s;
     }

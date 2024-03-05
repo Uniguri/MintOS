@@ -12,16 +12,22 @@
 #include "Task.h"
 
 ShellCommandEntry command_table[] = {
-    {"help", "Show Help", kHelp},
-    {"clear", "Clear Screen", kClear},
-    {"totalram", "Show Total RAM Size", kShowRamSize},
+    {"help", "Show Help", kConsoleHelp},
+    {"clear", "Clear Screen", kConsoleClear},
+    {"totalram", "Show Total RAM Size", kConsoleShowRamSize},
     {"settimer", "Set PIT Controller Counter0, ex)settimer 10(ms) 1(periodic)",
-     kSetTimer},
-    {"wait", "Wait ms Using PIT, ex)wait 100(ms)", kWaitUsingPIT},
-    {"rdtsc", "Read Time Stamp Counter", kPrintTimeStampCounter},
-    {"date", "Show Date", kShowDate},
-    {"time", "Show Time", kShowTime},
-    {"createtask", "Create Task", kCreateTestTask},
+     kConsoleSetTimer},
+    {"wait", "Wait ms Using PIT, ex)wait 100(ms)", kConsoleWaitUsingPIT},
+    {"rdtsc", "Read Time Stamp Counter", kConsolePrintTimeStampCounter},
+    {"date", "Show Date", kConsoleShowDate},
+    {"time", "Show Time", kConsoleShowTime},
+    {"createtask", "Create Task", kConsoleCreateTestTask},
+    {"changepriority",
+     "Change Task Priority, ex)changepriority 1(ID) 2(Priority)",
+     kConsoleChangeTaskPriority},
+    {"ps", "Show Task List", kConsoleShowTaskList},
+    {"kill", "End Task, ex)kill 1(ID)", kConsoleKillTask},
+    {"cpuload", "Show Processor Load", kConsoleCPULoad},
 };
 
 void kStartConsoleShell(void) {
@@ -78,8 +84,10 @@ void kExecuteCommand(const char* command_buffer) {
   size_t space_index = 0;
   if (arguments) {
     space_index = arguments - command_buffer;
+    ++arguments;
   } else {
     space_index = command_buffer_length;
+    arguments = command_buffer + space_index + 1;
   }
 
   const size_t number_of_command =
@@ -87,7 +95,7 @@ void kExecuteCommand(const char* command_buffer) {
   for (size_t i = 0; i < number_of_command; ++i) {
     const char* command = command_table[i].command;
     if (!memcmp(command_buffer, command, space_index)) {
-      return command_table[i].function(arguments + 1);
+      return command_table[i].function(arguments);
     }
   }
 
@@ -109,7 +117,8 @@ int kGetNextParameter(ParameterList* parameter_list, char* parameter) {
   const char* param_buf = parameter_list->buffer;
   const size_t cur_pos = parameter_list->current_position;
   const char* cur_buf = param_buf + cur_pos;
-  int64 space_idx_of_cur_buf = strchr(cur_buf, ' ') - param_buf;
+  const char* space_buf = strchr(cur_buf, ' ');
+  int64 space_idx_of_cur_buf = space_buf - param_buf;
   if (space_idx_of_cur_buf <= 0) {
     const size_t param_length = parameter_list->length;
     if (*cur_buf) {
@@ -134,7 +143,7 @@ int kGetNextParameter(ParameterList* parameter_list, char* parameter) {
 
 #define GET_NEXT_PARAM() kGetNextParameter(&list, param)
 
-void kHelp(const char* parameter_buffer) {
+static void kConsoleHelp(const char* parameter_buffer) {
   printf("=========================================================\n");
   printf("                    MINT64 Shell Help                    \n");
   printf("=========================================================\n");
@@ -158,16 +167,16 @@ void kHelp(const char* parameter_buffer) {
     printf("  - %s\n", command_table[i].help);
   }
 }
-void kClear(const char* parameter_buffer) {
+static void kConsoleClear(const char* parameter_buffer) {
   kClearScreen();
   kSetCursor(0, 1);
 }
 
-void kShowRamSize(const char* parameter_buffer) {
+static void kConsoleShowRamSize(const char* parameter_buffer) {
   printf("Total RAM size = %d MB.\n", kGetRamSize());
 }
 
-void kSetTimer(const char* parameter_buffer) {
+static void kConsoleSetTimer(const char* parameter_buffer) {
   MAKE_LIST_AND_PARAM(parameter_buffer);
 
   if (!GET_NEXT_PARAM()) {
@@ -187,7 +196,7 @@ void kSetTimer(const char* parameter_buffer) {
   kInitializePIT(MILLISEC_TO_COUNT(val), periodic);
 }
 
-void kWaitUsingPIT(const char* parameter_buffer) {
+static void kConsoleWaitUsingPIT(const char* parameter_buffer) {
   MAKE_LIST_AND_PARAM(parameter_buffer);
 
   if (!GET_NEXT_PARAM()) {
@@ -206,11 +215,11 @@ void kWaitUsingPIT(const char* parameter_buffer) {
   kInitializePIT(MILLISEC_TO_COUNT(1), true);
 }
 
-void kPrintTimeStampCounter(const char* parameter_buffer) {
+static void kConsolePrintTimeStampCounter(const char* parameter_buffer) {
   printf("Time Stamp Counter = %q\n", kReadTSC());
 }
 
-void kShowDate(const char* parameter_buffer) {
+static void kConsoleShowDate(const char* parameter_buffer) {
   uint8 sec, min, hour;
   uint8 day_of_week, day_of_month, month;
   uint16 year;
@@ -222,7 +231,7 @@ void kShowDate(const char* parameter_buffer) {
          kConvertDayOfWeekToString(day_of_week));
 }
 
-void kShowTime(const char* parameter_buffer) {
+static void kConsoleShowTime(const char* parameter_buffer) {
   uint8 sec, min, hour;
   uint8 day_of_week, day_of_month, month;
   uint16 year;
@@ -240,7 +249,7 @@ void kTestTask1(void) {
   uint8 data = 0;
   uint32 margin = (running_task->link.id & 0xFFFFFFFF) % 10;
   int i = 0, x = 0, y = 0;
-  while (1) {
+  for (int _ = 0; _ < 2000; ++_) {
     switch (i) {
       case 0:
         if (++x >= (CONSOLE_WIDTH - margin)) {
@@ -268,8 +277,10 @@ void kTestTask1(void) {
     screen[y * CONSOLE_WIDTH + x].attribute = data & 0x0F;
     ++data;
 
-    kSchedule();
+    // kSchedule();
   }
+
+  kExitTask();
 }
 
 void kTestTask2(void) {
@@ -287,11 +298,11 @@ void kTestTask2(void) {
     screen[offset].attribute = (offset % 15) + 1;
     ++i;
 
-    kSchedule();
+    // kSchedule();
   }
 }
 
-void kCreateTestTask(const char* parameter_buffer) {
+static void kConsoleCreateTestTask(const char* parameter_buffer) {
   MAKE_LIST_AND_PARAM(parameter_buffer);
 
   if (!GET_NEXT_PARAM()) {
@@ -310,7 +321,7 @@ void kCreateTestTask(const char* parameter_buffer) {
     case 1: {
       int i;
       for (i = 0; i < count; ++i) {
-        if (!kCreateTask(0, (uint64)kTestTask1)) {
+        if (!kCreateTask(kTaskPriorityLow, (uint64)kTestTask1)) {
           break;
         }
       }
@@ -319,7 +330,7 @@ void kCreateTestTask(const char* parameter_buffer) {
     case 2: {
       int i;
       for (i = 0; i < count; ++i) {
-        if (!kCreateTask(0, (uint64)kTestTask2)) {
+        if (!kCreateTask(kTaskPriorityLow, (uint64)kTestTask2)) {
           break;
         }
       }
@@ -329,6 +340,78 @@ void kCreateTestTask(const char* parameter_buffer) {
       printf("Invalid type\n");
       break;
   }
+}
+
+static void kConsoleChangeTaskPriority(const char* parameter_buffer) {
+  MAKE_LIST_AND_PARAM(parameter_buffer);
+
+  if (!GET_NEXT_PARAM()) {
+    printf("Usage: changepriority [task id] [priority; 0~4]\n");
+    return;
+  }
+  uint64 task_id;
+  if (!memcmp(param, "0x", 2)) {
+    task_id = Uint64FromHexString(param);
+  } else {
+    task_id = Uint64FromDecimalString(param);
+  }
+
+  if (!GET_NEXT_PARAM()) {
+    printf("Usage: changepriority [task id] [priority; 0~4]\n");
+    return;
+  }
+  uint64 priority = Uint64FromDecimalString(param);
+
+  kChangeTaskPriority(task_id, priority);
+}
+
+static void kConsoleShowTaskList(const char* parameter_buffer) {
+  printf("=========== Task Total Count [%d] ===========\n", kGetTaskCount());
+  int count = 0;
+  for (int i = 0; i < TASK_MAX_COUNT; ++i) {
+    TaskControlBlock* tcb = kGetTCBInTCBPool(i);
+    if (tcb->flags & TASK_FLAG_END_TASK) {
+      continue;
+    }
+
+    printf("[%d] Task ID[%p], Priority[%d], Flags[%p]\n", 1 + count++,
+           tcb->link.id, GET_TASK_PRIORITY(tcb), tcb->flags);
+
+    if (count % 10 == 0) {
+      printf("Press any key to continue... ('q' is exit) : ");
+      if (getch() == 'q') {
+        printf("\n");
+        break;
+      } else {
+        printf("\n");
+      }
+    }
+  }
+}
+
+static void kConsoleKillTask(const char* parameter_buffer) {
+  MAKE_LIST_AND_PARAM(parameter_buffer);
+
+  if (!GET_NEXT_PARAM()) {
+    printf("Usage: kill [task id]\n");
+    return;
+  }
+  uint64 task_id;
+  if (!memcmp(param, "0x", 2)) {
+    task_id = Uint64FromHexString(param);
+  } else {
+    task_id = Uint64FromDecimalString(param);
+  }
+  if (task_id >= TASK_MAX_COUNT) {
+    printf("Invalid task id\n");
+    return;
+  }
+
+  kEndTask(task_id);
+}
+
+static void kConsoleCPULoad(const char* parameter_buffer) {
+  printf("Processor Load : %d%%\n", kGetProcessorLoad());
 }
 
 #undef MAKE_LIST_AND_PARAM
