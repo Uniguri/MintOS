@@ -32,6 +32,9 @@
 #define TASK_RSP_OFFSET (22)
 #define TASK_SS_OFFSET (23)
 
+#define TASK_ID_PRESENT (BIT(32llu))
+#define IS_TASK_PRESENT(task) (IS_BIT_SET((task)->link.id, 32llu))
+
 #define TASK_TCB_POOL_ADDRESS (BYTE_FROM_MB(8))
 #define TASK_MAX_COUNT (1024)
 #define GET_TCB_OFFSET_FROM_ID(id) ((id) & 0xFFFFFFFF)
@@ -155,7 +158,9 @@ bool kIsProcessorTimeExpired(void);
 TaskControlBlock* kRemoveTaskFromReadyList(uint64 id);
 bool kChangeTaskPriority(uint64 id, enum TaskPriority priority);
 // End specific task.
-// @param id: id of task to end.
+// @param id: id of task to end. If you want to end present(alive) task, id's
+// 32bit(present bit) must be set. Otherwise this function may cause General
+// Protection fault.
 // @return true if success.
 bool kEndTask(uint64 id);
 // End current running task.

@@ -40,7 +40,7 @@ TaskControlBlock* kAllocateTCB(void) {
     }
   }
 
-  tcb->link.id = (BIT(32llu) | id);
+  tcb->link.id = (TASK_ID_PRESENT | id);
   ++tcb_pool_manager.use_count;
   ++tcb_pool_manager.alloacted_count;
   if (tcb_pool_manager.alloacted_count == 0) {
@@ -51,9 +51,9 @@ TaskControlBlock* kAllocateTCB(void) {
 }
 
 void kFreeTCB(uint64 id) {
-  uint64 i = id & 0xFFFFFFFF;
-  memset(&tcb_pool_manager.tcb[i], 0, sizeof(Context));
-  tcb_pool_manager.tcb[i].link.id = i;
+  uint64 offset = GET_TCB_OFFSET_FROM_ID(id);
+  memset(&tcb_pool_manager.tcb[offset], 0, sizeof(Context));
+  tcb_pool_manager.tcb[offset].link.id = offset;
   --tcb_pool_manager.use_count;
 }
 

@@ -25,8 +25,10 @@ ShellCommandEntry command_table[] = {
     {"changepriority",
      "Change Task Priority, ex)changepriority 1(ID) 2(Priority)",
      kConsoleChangeTaskPriority},
-    {"ps", "Show Task List", kConsoleShowTaskList},
-    {"kill", "End Task, ex)kill 1(ID)", kConsoleKillTask},
+    {"ps", "Show Task List. ex) ps {do only show alive; 1 or 0}",
+     kConsoleShowTaskList},
+    {"kill", "End Task, ex)kill 1(ID) {do kill only alive; 1 or 0}",
+     kConsoleKillTask},
     {"cpuload", "Show Processor Load", kConsoleCPULoad},
 };
 
@@ -366,7 +368,14 @@ static void kConsoleChangeTaskPriority(const char* parameter_buffer) {
 }
 
 static void kConsoleShowTaskList(const char* parameter_buffer) {
+  MAKE_LIST_AND_PARAM(parameter_buffer);
+
   printf("=========== Task Total Count [%d] ===========\n", kGetTaskCount());
+  bool do_only_print_present = 1;
+  if (GET_NEXT_PARAM()) {
+    do_only_print_present = (bool)Int32FromDecimalString(param);
+  }
+
   int count = 0;
   for (int i = 0; i < TASK_MAX_COUNT; ++i) {
     TaskControlBlock* tcb = kGetTCBInTCBPool(i);
@@ -374,8 +383,16 @@ static void kConsoleShowTaskList(const char* parameter_buffer) {
       continue;
     }
 
-    printf("[%d] Task ID[%p], Priority[%d], Flags[%p]\n", 1 + count++,
-           tcb->link.id, GET_TASK_PRIORITY(tcb), tcb->flags);
+    if (do_only_print_present) {
+      if (IS_TASK_PRESENT(tcb)) {
+        printf("[%d] Task ID[%p], Priority[%d], Flags[%p]\n", 1 + count++,
+               GET_TCB_OFFSET_FROM_ID(tcb->link.id), GET_TASK_PRIORITY(tcb),
+               tcb->flags);
+      }
+    } else {
+      printf("[%d] Task ID[%p], Priority[%d], Flags[%p]\n", 1 + count++,
+             tcb->link.id, GET_TASK_PRIORITY(tcb), tcb->flags);
+    }
 
     if (count % 10 == 0) {
       printf("Press any key to continue... ('q' is exit) : ");
@@ -393,21 +410,31 @@ static void kConsoleKillTask(const char* parameter_buffer) {
   MAKE_LIST_AND_PARAM(parameter_buffer);
 
   if (!GET_NEXT_PARAM()) {
-    printf("Usage: kill [task id]\n");
+    printf("Usage: kill [task id] {do kill only alive; 1 or 0}\n");
     return;
   }
+
   uint64 task_id;
   if (!memcmp(param, "0x", 2)) {
     task_id = Uint64FromHexString(param);
   } else {
     task_id = Uint64FromDecimalString(param);
   }
-  if (task_id >= TASK_MAX_COUNT) {
+  if (GET_TCB_OFFSET_FROM_ID(task_id) >= TASK_MAX_COUNT) {
     printf("Invalid task id\n");
     return;
   }
 
-  kEndTask(task_id);
+  bool do_kill_only_alive = 1;
+  if (GET_NEXT_PARAM()) {
+    do_kill_only_alive = (bool)Int32FromDecimalString(param);
+  }
+
+  if (do_kill_only_alive) {
+    kEndTask(TASK_ID_PRESENT | task_id);
+  } else {
+    kEndTask(task_id);
+  }
 }
 
 static void kConsoleCPULoad(const char* parameter_buffer) {
