@@ -29,6 +29,7 @@ ShellCommandEntry command_table[] = {
      kConsoleChangeTaskPriority},
     {"ps", "Show Task List. ex) ps {do only show alive; 1 or 0}",
      kConsoleShowTaskList},
+    {"taskinfo", "Print information of task, ex) taskinfo 1", kConsoleTaskInfo},
     {"kill", "End Task, ex)kill 1(ID) {do kill only alive; 1 or 0}",
      kConsoleKillTask},
     {"cpuload", "Show Processor Load", kConsoleCPULoad},
@@ -409,7 +410,37 @@ static void kConsoleShowTaskList(const char* parameter_buffer) {
   }
 }
 
+static void kConsoleTaskInfo(const char* parameter_buffer) {
+  MAKE_LIST_AND_PARAM(parameter_buffer);
+  if (!GET_NEXT_PARAM()) {
+    printf("Usage: taskinfo [task id]\n");
+    return;
+  }
+
+  uint64 task_id;
+  if (!memcmp(param, "0x", 2)) {
+    task_id = Int64FromDecimalString(param);
+  } else {
+    task_id = Int64FromHexString(param);
+  }
+
+  TaskControlBlock* tcb = kGetTCBInTCBPool(GET_TCB_OFFSET_FROM_ID(task_id));
+  printf(
+      "Task [%p] : Address = %p\n"
+      "    flags = %p\n"
+      "    context = {\n"
+      "        GS: %p, FS: %p, ES: %p, DS: %p, CS: %p, SS: %p\n"
+      "    }\n"
+      "    stack_addr = %p\n",
+      tcb->link.id, tcb, tcb->flags, tcb->context.gs, tcb->context.fs,
+      tcb->context.es, tcb->context.ds, tcb->context.cs, tcb->context.ss,
+      tcb->stack_addr);
+}
+
 // Maybe in this function, something wrong.
+// After "createtask 2 1022" and "kill all", the idle task's
+// TCB(0x800000+0xE8) is corrupted. After that operations, its ES and DS, SS
+// is 0x8000??.
 static void kConsoleKillTask(const char* parameter_buffer) {
   MAKE_LIST_AND_PARAM(parameter_buffer);
 

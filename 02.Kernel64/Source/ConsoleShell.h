@@ -39,6 +39,7 @@ static void kConsoleShowTime(const char* parameter_buffer);
 static void kConsoleCreateTestTask(const char* parameter_buffer);
 static void kConsoleChangeTaskPriority(const char* parameter_buffer);
 static void kConsoleShowTaskList(const char* parameter_buffer);
+static void kConsoleTaskInfo(const char* parameter_buffer);
 static void kConsoleKillTask(const char* parameter_buffer);
 static void kConsoleCPULoad(const char* parameter_buffer);
 static void kConsoleTestMutex(const char* parameter_buffer);

@@ -35,7 +35,7 @@ TaskControlBlock* kAllocateTCB(void) {
   for (uint64 i = 0; i < tcb_pool_manager.max_count; ++i) {
     if (!IS_BIT_SET(tcb_pool_manager.tcb[i].link.id, 32)) {
       tcb = &tcb_pool_manager.tcb[i];
-      id = tcb->link.id;
+      id = i;
       break;
     }
   }
@@ -50,9 +50,9 @@ TaskControlBlock* kAllocateTCB(void) {
   return tcb;
 }
 
-void kFreeTCB(uint64 id) {
+inline void kFreeTCB(uint64 id) {
   uint64 offset = GET_TCB_OFFSET_FROM_ID(id);
-  memset(&tcb_pool_manager.tcb[offset], 0, sizeof(Context));
+  memset(&tcb_pool_manager.tcb[offset].context, 0, sizeof(Context));
   tcb_pool_manager.tcb[offset].link.id = offset;
   --tcb_pool_manager.use_count;
 }
@@ -332,7 +332,6 @@ bool kEndTask(uint64 id) {
     if (target) {
       target->flags |= TASK_FLAG_END_TASK;
       SET_TASK_PRIORITY(target, kTaskPriorityWait);
-      kAddListToTail(&scheduler.task_to_end_list, target);
     }
 
     kUnlockForSystemData(prev_flag);
@@ -397,22 +396,19 @@ void kIdleTask(void) {
 
     kHaltProcessorByLoad();
 
-    if (kGetListCount(&scheduler.task_to_end_list) >= 0) {
-      while (1) {
-        const bool prev_flag = kLockForSystemData();
-        TaskControlBlock* task =
-            kRemoveListFromHead(&scheduler.task_to_end_list);
-        if (!task) {
-          kUnlockForSystemData(prev_flag);
-          break;
-        }
-        const uint64 id = task->link.id;
-        kFreeTCB(id);
+    while (kGetListCount(&scheduler.task_to_end_list) > 0) {
+      const bool prev_flag = kLockForSystemData();
+      TaskControlBlock* task = kRemoveListFromHead(&scheduler.task_to_end_list);
+      if (!task) {
         kUnlockForSystemData(prev_flag);
+        break;
       }
-
-      kSchedule();
+      const uint64 id = task->link.id;
+      kFreeTCB(id);
+      kUnlockForSystemData(prev_flag);
     }
+
+    kSchedule();
   }
 }
 

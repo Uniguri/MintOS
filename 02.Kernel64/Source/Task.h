@@ -5,7 +5,7 @@
 #include "Macro.h"
 #include "Types.h"
 
-#define TASK_REGISTER_COUNT (24)
+#define TASK_REGISTER_COUNT (5 + 19)
 #define TASK_REGISTER_SIZE (8)
 #define TASK_GS_OFFSET (0)
 #define TASK_FS_OFFSET (1)
@@ -87,6 +87,7 @@ typedef struct kContextStruct {
   uint64 rsp;
   uint64 ss;
 } Context;
+_Static_assert(sizeof(Context) == 8 * TASK_REGISTER_COUNT);
 
 typedef struct kTaskControlBlockStruct {
   ListLink link;
@@ -114,7 +115,7 @@ typedef struct kSchedulerStruct {
 
   List task_to_run_list[kTaskNumberOfPriority];
   List task_to_end_list;
-  enum TaskPriority execute_count[kTaskNumberOfPriority];
+  uint32 execute_count[kTaskNumberOfPriority];
 
   uint64 processor_load;
   uint64 spend_processor_time_ind_idle_task;

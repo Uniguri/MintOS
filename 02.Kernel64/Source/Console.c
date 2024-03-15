@@ -64,18 +64,18 @@ int kConsolePrintString(const char* buffer) {
       screen[print_offset].attribute = CONSOLE_DEFAULT_TEXT_COLOR;
       ++print_offset;
     }
-  }
-  if (print_offset >= (CONSOLE_HEIGHT * CONSOLE_WIDTH)) {
-    memcpy(CONSOLE_VIDEO_MEMORY_ADDRESS,
-           CONSOLE_VIDEO_MEMORY_ADDRESS + CONSOLE_WIDTH * sizeof(Character),
-           (CONSOLE_HEIGHT - 1) * CONSOLE_WIDTH * sizeof(Character));
-    for (size_t j = (CONSOLE_HEIGHT - 1) * CONSOLE_WIDTH;
-         j < CONSOLE_HEIGHT * CONSOLE_WIDTH; ++j) {
-      screen[j].charactor = ' ';
-      screen[j].attribute = CONSOLE_DEFAULT_TEXT_COLOR;
-    }
+    if (print_offset >= (CONSOLE_HEIGHT * CONSOLE_WIDTH)) {
+      memcpy(CONSOLE_VIDEO_MEMORY_ADDRESS,
+             CONSOLE_VIDEO_MEMORY_ADDRESS + CONSOLE_WIDTH * sizeof(Character),
+             (CONSOLE_HEIGHT - 1) * CONSOLE_WIDTH * sizeof(Character));
+      for (size_t j = (CONSOLE_HEIGHT - 1) * CONSOLE_WIDTH;
+           j < CONSOLE_HEIGHT * CONSOLE_WIDTH; ++j) {
+        screen[j].charactor = ' ';
+        screen[j].attribute = CONSOLE_DEFAULT_TEXT_COLOR;
+      }
 
-    print_offset = (CONSOLE_HEIGHT - 1) * CONSOLE_WIDTH;
+      print_offset = (CONSOLE_HEIGHT - 1) * CONSOLE_WIDTH;
+    }
   }
 
   return print_offset;
