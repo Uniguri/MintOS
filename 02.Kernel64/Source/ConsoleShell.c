@@ -409,6 +409,7 @@ static void kConsoleShowTaskList(const char* parameter_buffer) {
   }
 }
 
+// Maybe in this function, something wrong.
 static void kConsoleKillTask(const char* parameter_buffer) {
   MAKE_LIST_AND_PARAM(parameter_buffer);
 
@@ -420,10 +421,8 @@ static void kConsoleKillTask(const char* parameter_buffer) {
   uint64 task_id;
   if (!memcmp(param, "all", 3)) {
     for (int i = 2; i < TASK_MAX_COUNT; ++i) {
-      TaskControlBlock* tcb = kGetTCBInTCBPool(i);
-      if (IS_TASK_PRESENT(tcb)) {
-        uint64 id = tcb->link.id;
-        kEndTask(id);
+      if (kIsTaskExist(i)) {
+        kEndTask(TASK_ID_PRESENT | i);
       }
     }
     return;
@@ -443,7 +442,9 @@ static void kConsoleKillTask(const char* parameter_buffer) {
   }
 
   if (do_kill_only_alive) {
-    kEndTask(TASK_ID_PRESENT | task_id);
+    if (kIsTaskExist(task_id)) {
+      kEndTask(TASK_ID_PRESENT | task_id);
+    }
   } else {
     kEndTask(task_id);
   }

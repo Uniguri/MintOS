@@ -70,6 +70,7 @@ TaskControlBlock* kCreateTask(uint64 flags, uint64 entry_point_addr) {
       (void*)(TASK_STACK_POOL_ADDRESS +
               TASK_STACK_SIZE * GET_TCB_OFFSET_FROM_ID(task->link.id));
   kSetUpTask(task, flags, entry_point_addr, stack_addr, TASK_STACK_SIZE);
+
   prev_flag = kLockForSystemData();
   kAddTaskToReadyList(task);
   kUnlockForSystemData(prev_flag);
@@ -163,7 +164,6 @@ void kSchedule(void) {
   }
 
   const bool prev_flag = kLockForSystemData();
-
   TaskControlBlock* next_task = kGetNextTaskToRun();
   if (!next_task) {
     kUnlockForSystemData(prev_flag);
@@ -369,7 +369,7 @@ inline TaskControlBlock* kGetTCBInTCBPool(uint64 offset) {
 
 inline bool kIsTaskExist(uint64 id) {
   const TaskControlBlock* tcb = kGetTCBInTCBPool(GET_TCB_OFFSET_FROM_ID(id));
-  return (tcb && tcb->link.id == id);
+  return (tcb && IS_TASK_PRESENT(tcb));
 }
 
 inline uint64 kGetProcessorLoad(void) { return scheduler.processor_load; }
@@ -397,16 +397,22 @@ void kIdleTask(void) {
 
     kHaltProcessorByLoad();
 
-    while (kGetListCount(&scheduler.task_to_end_list)) {
-      const bool prev_flag = kLockForSystemData();
-      TaskControlBlock* task = kRemoveListFromHead(&scheduler.task_to_end_list);
-      if (task) {
-        kFreeTCB(task->link.id);
+    if (kGetListCount(&scheduler.task_to_end_list) >= 0) {
+      while (1) {
+        const bool prev_flag = kLockForSystemData();
+        TaskControlBlock* task =
+            kRemoveListFromHead(&scheduler.task_to_end_list);
+        if (!task) {
+          kUnlockForSystemData(prev_flag);
+          break;
+        }
+        const uint64 id = task->link.id;
+        kFreeTCB(id);
+        kUnlockForSystemData(prev_flag);
       }
-      kUnlockForSystemData(prev_flag);
-    }
 
-    kSchedule();
+      kSchedule();
+    }
   }
 }
 
