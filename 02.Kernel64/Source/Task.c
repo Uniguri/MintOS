@@ -1,9 +1,9 @@
 #include "Task.h"
 
 #include "Descriptor.h"
-#include "Interrupt.h"
 #include "Macro.h"
 #include "Memory.h"
+#include "Synchronization.h"
 #include "Tick.h"
 #include "Types.h"
 
@@ -58,15 +58,21 @@ void kFreeTCB(uint64 id) {
 }
 
 TaskControlBlock* kCreateTask(uint64 flags, uint64 entry_point_addr) {
+  bool prev_flag = kLockForSystemData();
   TaskControlBlock* task = kAllocateTCB();
   if (!task) {
+    kUnlockForSystemData(prev_flag);
     return nullptr;
   }
+  kUnlockForSystemData(prev_flag);
+
   void* stack_addr =
       (void*)(TASK_STACK_POOL_ADDRESS +
               TASK_STACK_SIZE * GET_TCB_OFFSET_FROM_ID(task->link.id));
   kSetUpTask(task, flags, entry_point_addr, stack_addr, TASK_STACK_SIZE);
+  prev_flag = kLockForSystemData();
   kAddTaskToReadyList(task);
+  kUnlockForSystemData(prev_flag);
   return task;
 }
 
@@ -111,11 +117,16 @@ void kInitializeScheduler(void) {
 }
 
 inline void kSetRunningTask(TaskControlBlock* task) {
+  const bool prev_flag = kLockForSystemData();
   scheduler.running_task = task;
+  kUnlockForSystemData(prev_flag);
 }
 
 inline TaskControlBlock* kGetRunningTask(void) {
-  return scheduler.running_task;
+  const bool prev_flag = kLockForSystemData();
+  TaskControlBlock* running_task = scheduler.running_task;
+  kUnlockForSystemData(prev_flag);
+  return running_task;
 }
 
 TaskControlBlock* kGetNextTaskToRun(void) {
@@ -151,12 +162,11 @@ void kSchedule(void) {
     return;
   }
 
-  const bool prev_flag = kIsInterruptEnabled();
-  kSetInterruptFlag(false);
+  const bool prev_flag = kLockForSystemData();
 
   TaskControlBlock* next_task = kGetNextTaskToRun();
   if (!next_task) {
-    kSetInterruptFlag(prev_flag);
+    kUnlockForSystemData(prev_flag);
     return;
   }
 
@@ -181,12 +191,14 @@ void kSchedule(void) {
   }
 
   scheduler.processor_time = TASK_PROCESSOR_TIME;
-  kSetInterruptFlag(prev_flag);
+  kUnlockForSystemData(prev_flag);
 }
 
 bool kScheduleInInterrupt(void) {
+  const bool prev_flag = kLockForSystemData();
   TaskControlBlock* next_task = kGetNextTaskToRun();
   if (!next_task) {
+    kUnlockForSystemData(prev_flag);
     return false;
   }
 
@@ -212,6 +224,8 @@ bool kScheduleInInterrupt(void) {
     memcpy(&prev_task->context, ist_context_addr, sizeof(Context));
     kAddTaskToReadyList(prev_task);
   }
+  kUnlockForSystemData(prev_flag);
+
   // Switch context by copying.
   memcpy(ist_context_addr, &task_to_run->context, sizeof(Context));
 
@@ -250,10 +264,14 @@ bool kChangeTaskPriority(uint64 id, enum TaskPriority priority) {
     return false;
   }
 
+  const bool prev_flag = kLockForSystemData();
+
   // When task is running task, only change priority.
   TaskControlBlock* target = scheduler.running_task;
   if (target->link.id == id) {
     SET_TASK_PRIORITY(target, priority);
+
+    kUnlockForSystemData(prev_flag);
     return true;
   }
 
@@ -263,6 +281,8 @@ bool kChangeTaskPriority(uint64 id, enum TaskPriority priority) {
   if (target) {
     SET_TASK_PRIORITY(target, priority);
     kAddTaskToReadyList(target);
+
+    kUnlockForSystemData(prev_flag);
     return true;
   }
 
@@ -270,18 +290,24 @@ bool kChangeTaskPriority(uint64 id, enum TaskPriority priority) {
   target = kGetTCBInTCBPool(GET_TCB_OFFSET_FROM_ID(id));
   if (target) {
     SET_TASK_PRIORITY(target, priority);
+
+    kUnlockForSystemData(prev_flag);
     return true;
   }
 
+  kUnlockForSystemData(prev_flag);
   return false;
 }
 
 bool kEndTask(uint64 id) {
+  const bool prev_flag = kLockForSystemData();
   TaskControlBlock* target = scheduler.running_task;
   // When need to end current running task.
   if (target->link.id == id) {
     target->flags |= TASK_FLAG_END_TASK;
     SET_TASK_PRIORITY(target, kTaskPriorityWait);
+
+    kUnlockForSystemData(prev_flag);
 
     kSchedule();
 
@@ -296,6 +322,8 @@ bool kEndTask(uint64 id) {
       target->flags |= TASK_FLAG_END_TASK;
       SET_TASK_PRIORITY(target, kTaskPriorityWait);
       kAddListToTail(&scheduler.task_to_end_list, target);
+
+      kUnlockForSystemData(prev_flag);
       return true;
     }
 
@@ -306,22 +334,30 @@ bool kEndTask(uint64 id) {
       SET_TASK_PRIORITY(target, kTaskPriorityWait);
       kAddListToTail(&scheduler.task_to_end_list, target);
     }
+
+    kUnlockForSystemData(prev_flag);
     return false;
   }
 }
 
 inline void kExitTask(void) { kEndTask(scheduler.running_task->link.id); }
 
-inline size_t kGetReadyTaskCount(void) {
+size_t kGetReadyTaskCount(void) {
+  const bool prev_flag = kLockForSystemData();
   size_t total_count = 0;
   for (int i = 0; i < kTaskNumberOfPriority; ++i) {
     total_count += kGetListCount(&scheduler.task_to_run_list[i]);
   }
+  kUnlockForSystemData(prev_flag);
   return total_count;
 }
 
 inline size_t kGetTaskCount(void) {
-  return kGetReadyTaskCount() + kGetListCount(&scheduler.task_to_end_list) + 1;
+  const bool prev_flag = kLockForSystemData();
+  size_t ret =
+      kGetReadyTaskCount() + kGetListCount(&scheduler.task_to_end_list) + 1;
+  kUnlockForSystemData(prev_flag);
+  return ret;
 }
 
 inline TaskControlBlock* kGetTCBInTCBPool(uint64 offset) {
@@ -362,10 +398,12 @@ void kIdleTask(void) {
     kHaltProcessorByLoad();
 
     while (kGetListCount(&scheduler.task_to_end_list)) {
+      const bool prev_flag = kLockForSystemData();
       TaskControlBlock* task = kRemoveListFromHead(&scheduler.task_to_end_list);
       if (task) {
         kFreeTCB(task->link.id);
       }
+      kUnlockForSystemData(prev_flag);
     }
 
     kSchedule();

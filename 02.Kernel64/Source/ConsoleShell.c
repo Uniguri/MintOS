@@ -9,7 +9,9 @@
 #include "PIT.h"
 #include "RTC.h"
 #include "String.h"
+#include "Synchronization.h"
 #include "Task.h"
+#include "Tick.h"
 
 ShellCommandEntry command_table[] = {
     {"help", "Show Help", kConsoleHelp},
@@ -30,6 +32,7 @@ ShellCommandEntry command_table[] = {
     {"kill", "End Task, ex)kill 1(ID) {do kill only alive; 1 or 0}",
      kConsoleKillTask},
     {"cpuload", "Show Processor Load", kConsoleCPULoad},
+    {"testmutex", "Test Mutex Function", kConsoleTestMutex},
 };
 
 void kStartConsoleShell(void) {
@@ -410,12 +413,21 @@ static void kConsoleKillTask(const char* parameter_buffer) {
   MAKE_LIST_AND_PARAM(parameter_buffer);
 
   if (!GET_NEXT_PARAM()) {
-    printf("Usage: kill [task id] {do kill only alive; 1 or 0}\n");
+    printf("Usage: kill [task id or all] {do kill only alive; 1 or 0}\n");
     return;
   }
 
   uint64 task_id;
-  if (!memcmp(param, "0x", 2)) {
+  if (!memcmp(param, "all", 3)) {
+    for (int i = 2; i < TASK_MAX_COUNT; ++i) {
+      TaskControlBlock* tcb = kGetTCBInTCBPool(i);
+      if (IS_TASK_PRESENT(tcb)) {
+        uint64 id = tcb->link.id;
+        kEndTask(id);
+      }
+    }
+    return;
+  } else if (!memcmp(param, "0x", 2)) {
     task_id = Uint64FromHexString(param);
   } else {
     task_id = Uint64FromDecimalString(param);
@@ -439,6 +451,37 @@ static void kConsoleKillTask(const char* parameter_buffer) {
 
 static void kConsoleCPULoad(const char* parameter_buffer) {
   printf("Processor Load : %d%%\n", kGetProcessorLoad());
+}
+
+static Mutex mutex;
+static volatile uint64 adder;
+void kConsolePrintNumberTask(void) {
+  uint64 tick_count = kGetTickCount();
+  while (kGetTickCount() - tick_count < 50) {
+    kSchedule();
+  }
+  for (int i = 0; i < 5; ++i) {
+    kLockMutex(&mutex);
+    printf("Task ID [%p] Value[%d]\n", kGetRunningTask()->link.id, adder++);
+    kUnlockMutex(&mutex);
+    for (int j = 0; j < 30000; ++j)
+      ;
+  }
+  tick_count = kGetTickCount();
+  while (kGetTickCount() - tick_count < 1000) {
+    kSchedule();
+  }
+  kExitTask();
+}
+
+static void kConsoleTestMutex(const char* parameter_buffer) {
+  adder = 1;
+  kInitializeMutex(&mutex);
+  for (int i = 0; i < 3; ++i) {
+    kCreateTask(kTaskPriorityLow, (uint64)kConsolePrintNumberTask);
+  }
+  printf("Wit Until %d Task End\n", 3);
+  getch();
 }
 
 #undef MAKE_LIST_AND_PARAM

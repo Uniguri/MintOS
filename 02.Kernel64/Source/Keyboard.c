@@ -4,6 +4,7 @@
 #include "Interrupt.h"
 #include "Macro.h"
 #include "Queue.h"
+#include "Synchronization.h"
 #include "Types.h"
 
 static KeyboardManager keyboard_manager = {
@@ -120,10 +121,9 @@ bool kConvertScanCodeAndPushToQueue(uint8 scan_code) {
   bool ret = false;
   if (kConvertScanCodeToAsciiCode(scan_code, &key_data.ascii_code,
                                   &key_data.flag)) {
-    bool previouse_interrupt_status = kIsInterruptEnabled();
-    kSetInterruptFlag(false);
+    const bool prev_flag = kLockForSystemData();
     ret = kPushQueue(&key_queue, &key_data);
-    kSetInterruptFlag(previouse_interrupt_status);
+    kUnlockForSystemData(prev_flag);
   }
 
   return ret;
@@ -135,13 +135,12 @@ bool kGetKeyFromKeyQueue(KeyData* key_data) {
     return false;
   }
 
-  bool previouse_interrupt_status = kIsInterruptEnabled();
+  const bool prev_flag = kLockForSystemData();
   bool ret = true;
-  kSetInterruptFlag(false);
   ret &= kGetFrontFromQueue(&key_queue, key_data);
   ret &= kPopQueue(&key_queue);
-  kSetInterruptFlag(previouse_interrupt_status);
 
+  kUnlockForSystemData(prev_flag);
   return ret;
 }
 
