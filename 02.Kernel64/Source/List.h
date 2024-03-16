@@ -20,16 +20,16 @@ void kInitializeList(List* list);
 size_t kGetListCount(const List* list);
 void kAddListToTail(List* list, void* item);
 void kAddListToHead(List* list, void* item);
-// Remove element with id from list.
+// Remove element with id from list and return it.
 // @param list: pointer to list.
 // @id: id to remove element.
 // @return valid pointer if success to remove. If fail, return nullptr.
 void* kRemoveList(List* list, uint64 id);
-// Remove head element from list.
+// Remove head element from list and return it.
 // @param list: pointer to list.
 // @return valid pointer if success to remove. If fail, return nullptr.
 void* kRemoveListFromHead(List* list);
-// Remove tail element from list.
+// Remove tail element from list and return it.
 // @param list: pointer to list.
 // @return valid pointer if success to remove. If fail, return nullptr.
 void* kRemoveListFromTail(List* list);

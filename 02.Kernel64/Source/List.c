@@ -11,35 +11,34 @@ inline void kInitializeList(List* list) {
 inline size_t kGetListCount(const List* list) { return list->item_count; }
 
 void kAddListToTail(List* list, void* item) {
-  ListLink* now = (ListLink*)item;
-  now->next = nullptr;
+  ListLink* new_node = (ListLink*)item;
+  new_node->next = nullptr;
 
-  if (!list->head) {
+  if (list->item_count == 0 || !list->head) {
     list->head = item;
     list->tail = item;
     list->item_count = 1;
     return;
   }
 
-  now = (ListLink*)list->tail;
-  now->next = item;
-
-  list->tail = item;
+  ListLink* tail = list->tail;
+  tail->next = new_node;
+  list->tail = new_node;
   ++list->item_count;
 }
 
 void kAddListToHead(List* list, void* item) {
-  ListLink* link = (ListLink*)item;
-  link->next = list->head;
+  ListLink* new_node = (ListLink*)item;
+  new_node->next = list->head;
 
-  if (!list->head) {
+  if (list->item_count == 0 || !list->head) {
     list->head = item;
     list->tail = item;
     list->item_count = 1;
     return;
   }
 
-  list->head = link;
+  list->head = new_node;
   ++list->item_count;
 }
 
@@ -50,7 +49,7 @@ void* kRemoveList(List* list, uint64 id) {
   prev = list->head;
   for (now = prev; now != nullptr; now = now->next) {
     if (now->id == id) {
-      if (now == list->head && now == list->tail) {
+      if (list->item_count == 1 || now == list->head && now == list->tail) {
         list->head = nullptr;
         list->tail = nullptr;
       } else if (now == list->head) {
@@ -71,7 +70,7 @@ void* kRemoveList(List* list, uint64 id) {
 }
 
 inline void* kRemoveListFromHead(List* list) {
-  if (!list->item_count) {
+  if (list->item_count == 0 || !list->head) {
     return nullptr;
   }
   ListLink* head = (ListLink*)list->head;
@@ -79,7 +78,7 @@ inline void* kRemoveListFromHead(List* list) {
 }
 
 inline void* kRemoveListFromTail(List* list) {
-  if (!list->item_count) {
+  if (list->item_count == 0 || !list->item_count) {
     return nullptr;
   }
   ListLink* tail = (ListLink*)list->tail;
