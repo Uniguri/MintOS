@@ -7,4 +7,6 @@ extern volatile uint64 tick_count;
 
 uint64 kGetTickCount(void);
 
+void kSleep(uint64 millisecond);
+
 #endif
