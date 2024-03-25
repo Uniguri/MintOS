@@ -21,10 +21,12 @@
 #define false (0)
 #define null (0)
 #define nullptr ((void*)0)
-#define TRUE (1)
-#define FALSE (0)
-#define NULL (0)
-#define NULLPTR ((void*)0)
+#define TRUE (true)
+#define FALSE (false)
+#define NULL (null)
+#define NULLPTR (nullptr)
+
+#define offsetof(TYPE, MEMBER) __builtin_offsetof(TYPE, MEMBER)
 
 #pragma pack(push, 1)
 // Structure for video memory. Video memory locate on 0xB8000 when in protected
