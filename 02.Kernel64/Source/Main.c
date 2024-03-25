@@ -61,7 +61,9 @@ void Main(void) {
   kSetCursor(45, cursor_y++);
   printf("Pass\n");
 
-  kCreateTask(kTaskPriorityLowest | TASK_FLAG_IDLE, (uint64)kIdleTask);
+  kCreateTask(kTaskPriorityLowest | TASK_FLAG_THREAD | TASK_FLAG_SYSTEM |
+                  TASK_FLAG_IDLE,
+              0, 0, (uint64)kIdleTask);
   kStartConsoleShell();
 
   // We dont need "while(1);" here because "jmp $" in EntryPoint.s

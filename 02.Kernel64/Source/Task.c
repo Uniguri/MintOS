@@ -18,7 +18,7 @@ void kInitializeTCBPool(void) {
          sizeof(TaskControlBlock) * TASK_MAX_COUNT);
 
   for (uint64 i = 0; i < TASK_MAX_COUNT; ++i) {
-    tcb_pool_manager.tcb[i].link.id = i;
+    tcb_pool_manager.tcb[i].id_link.id = i;
   }
 
   tcb_pool_manager.max_count = TASK_MAX_COUNT;
@@ -33,14 +33,14 @@ TaskControlBlock* kAllocateTCB(void) {
   TaskControlBlock* tcb;
   uint64 id;
   for (uint64 i = 0; i < tcb_pool_manager.max_count; ++i) {
-    if (!IS_BIT_SET(tcb_pool_manager.tcb[i].link.id, 32)) {
+    if (!IS_BIT_SET(tcb_pool_manager.tcb[i].id_link.id, 32)) {
       tcb = &tcb_pool_manager.tcb[i];
       id = i;
       break;
     }
   }
 
-  tcb->link.id = (TASK_ID_PRESENT | id);
+  tcb->id_link.id = (TASK_ID_PRESENT | id);
   ++tcb_pool_manager.use_count;
   ++tcb_pool_manager.alloacted_count;
   if (tcb_pool_manager.alloacted_count == 0) {
@@ -53,23 +53,45 @@ TaskControlBlock* kAllocateTCB(void) {
 inline void kFreeTCB(uint64 id) {
   uint64 offset = GET_TCB_OFFSET_FROM_ID(id);
   memset(&tcb_pool_manager.tcb[offset].context, 0, sizeof(Context));
-  tcb_pool_manager.tcb[offset].link.id = offset;
+  tcb_pool_manager.tcb[offset].id_link.id = offset;
   --tcb_pool_manager.use_count;
 }
 
-TaskControlBlock* kCreateTask(uint64 flags, uint64 entry_point_addr) {
+TaskControlBlock* kCreateTask(uint64 flags, void* memory_addr,
+                              size_t memory_size, uint64 entry_point_addr) {
   bool prev_flag = kLockForSystemData();
   TaskControlBlock* task = kAllocateTCB();
   if (!task) {
     kUnlockForSystemData(prev_flag);
     return nullptr;
   }
+
+  TaskControlBlock* cur_process = kGetProcessByThread(kGetRunningTask());
+  if (!cur_process) {
+    kFreeTCB(task->id_link.id);
+    kUnlockForSystemData(prev_flag);
+    return nullptr;
+  }
+
+  if (flags & TASK_FLAG_THREAD) {
+    task->parent_process_id = cur_process->id_link.id;
+    task->memory_addr = cur_process->memory_addr;
+    task->memory_size = cur_process->memory_size;
+
+    kAddListToTail(&cur_process->child_thread_list, &task->therad_link);
+  } else {
+    task->parent_process_id = cur_process->id_link.id;
+    task->memory_addr = memory_addr;
+    task->memory_size = memory_size;
+  }
+  task->therad_link.id = task->id_link.id;
   kUnlockForSystemData(prev_flag);
 
   void* stack_addr =
       (void*)(TASK_STACK_POOL_ADDRESS +
-              TASK_STACK_SIZE * GET_TCB_OFFSET_FROM_ID(task->link.id));
+              TASK_STACK_SIZE * GET_TCB_OFFSET_FROM_ID(task->id_link.id));
   kSetUpTask(task, flags, entry_point_addr, stack_addr, TASK_STACK_SIZE);
+  kInitializeList(&task->child_thread_list);
 
   prev_flag = kLockForSystemData();
   kAddTaskToReadyList(task);
@@ -80,8 +102,10 @@ TaskControlBlock* kCreateTask(uint64 flags, uint64 entry_point_addr) {
 void kSetUpTask(TaskControlBlock* tcb, uint64 flags, uint64 entry_point_addr,
                 void* stack_addr, uint64 stack_size) {
   memset(tcb->reg_context, 0, sizeof(tcb->reg_context));
-  tcb->context.rsp = (uint64)stack_addr + stack_size;
-  tcb->context.rbp = (uint64)stack_addr + stack_size;
+  tcb->context.rsp = (uint64)stack_addr + stack_size - 8;
+  tcb->context.rbp = (uint64)stack_addr + stack_size - 8;
+
+  *(uint64*)((uint64)stack_addr + stack_size - 8) = (uint64)kExitTask;
 
   tcb->context.cs = GDT_KERNEL_CODE_SEGMENT;
   tcb->context.ds = GDT_KERNEL_DATA_SEGMENT;
@@ -110,8 +134,14 @@ void kInitializeScheduler(void) {
   kInitializeList(&scheduler.task_to_end_list);
 
   // Set console shell task.
-  scheduler.running_task = kAllocateTCB();
-  SET_TASK_PRIORITY(scheduler.running_task, kTaskPriorityHighest);
+  TaskControlBlock* task = kAllocateTCB();
+  task->flags = kTaskPriorityHighest | TASK_FLAG_PROCESS | TASK_FLAG_SYSTEM;
+  task->parent_process_id = task->id_link.id;
+  task->memory_addr = (void*)0x100000;
+  task->memory_size = 0x500000;
+  task->stack_addr = (void*)0x600000;
+  task->stack_size = 0x100000;
+  scheduler.running_task = task;
 
   scheduler.processor_load = 0;
   scheduler.spend_processor_time_ind_idle_task = 0;
@@ -250,7 +280,7 @@ TaskControlBlock* kRemoveTaskFromReadyList(uint64 id) {
   }
 
   TaskControlBlock* target = &tcb_pool_manager.tcb[tcb_offset];
-  if (target->link.id != id) {
+  if (target->id_link.id != id) {
     return nullptr;
   }
 
@@ -268,7 +298,7 @@ bool kChangeTaskPriority(uint64 id, enum TaskPriority priority) {
 
   // When task is running task, only change priority.
   TaskControlBlock* target = scheduler.running_task;
-  if (target->link.id == id) {
+  if (target->id_link.id == id) {
     SET_TASK_PRIORITY(target, priority);
 
     kUnlockForSystemData(prev_flag);
@@ -303,7 +333,7 @@ bool kEndTask(uint64 id) {
   const bool prev_flag = kLockForSystemData();
   TaskControlBlock* target = scheduler.running_task;
   // When need to end current running task.
-  if (target->link.id == id) {
+  if (target->id_link.id == id) {
     target->flags |= TASK_FLAG_END_TASK;
     SET_TASK_PRIORITY(target, kTaskPriorityWait);
 
@@ -339,7 +369,7 @@ bool kEndTask(uint64 id) {
   }
 }
 
-inline void kExitTask(void) { kEndTask(scheduler.running_task->link.id); }
+inline void kExitTask(void) { kEndTask(scheduler.running_task->id_link.id); }
 
 size_t kGetReadyTaskCount(void) {
   const bool prev_flag = kLockForSystemData();
@@ -373,6 +403,20 @@ inline bool kIsTaskExist(uint64 id) {
 
 inline uint64 kGetProcessorLoad(void) { return scheduler.processor_load; }
 
+TaskControlBlock* kGetProcessByThread(TaskControlBlock* thread) {
+  if (IS_TASK_PROCESS(thread)) {
+    return thread;
+  }
+
+  TaskControlBlock* process =
+      kGetTCBInTCBPool(GET_TCB_OFFSET_FROM_ID(thread->parent_process_id));
+  if (!process || process->id_link.id != thread->parent_process_id) {
+    return nullptr;
+  }
+
+  return process;
+}
+
 void kIdleTask(void) {
   uint64 last_measure_tick = 0, last_spend_tick_in_idle_task = 0;
   uint64 current_measure_tick, current_spend_tick_in_idle_task;
@@ -403,7 +447,36 @@ void kIdleTask(void) {
         kUnlockForSystemData(prev_flag);
         break;
       }
-      const uint64 id = task->link.id;
+
+      if (IS_TASK_PROCESS(task)) {
+        const size_t count = kGetListCount(&task->child_thread_list);
+        for (size_t i = 0; i < count; ++i) {
+          void* thread_link = kRemoveListFromHead(&task->child_thread_list);
+          if (!thread_link) {
+            break;
+          }
+
+          TaskControlBlock* child_thread =
+              GET_TCB_FROM_THREAD_LINK(thread_link);
+          kAddListToTail(&task->child_thread_list, &child_thread->therad_link);
+          kEndTask(child_thread->id_link.id);
+        }
+
+        if (kGetListCount(&task->child_thread_list) > 0) {
+          kAddListToTail(&scheduler.task_to_end_list, task);
+          kUnlockForSystemData(prev_flag);
+          continue;
+        } else {
+          // TODO: Delete allocated memory
+        }
+      } else if (IS_TASK_THREAD(task)) {
+        TaskControlBlock* process = kGetProcessByThread(task);
+        if (process) {
+          kRemoveList(&process->child_thread_list, task->id_link.id);
+        }
+      }
+
+      const uint64 id = task->id_link.id;
       kFreeTCB(id);
       kUnlockForSystemData(prev_flag);
     }

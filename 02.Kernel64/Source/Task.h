@@ -33,11 +33,14 @@
 #define TASK_SS_OFFSET (23)
 
 #define TASK_ID_PRESENT (BIT(32llu))
-#define IS_TASK_PRESENT(task) (IS_BIT_SET((task)->link.id, 32llu))
+#define IS_TASK_PRESENT(task) (IS_BIT_SET((task)->id_link.id, 32llu))
 
 #define TASK_TCB_POOL_ADDRESS (BYTE_FROM_MB(8))
 #define TASK_MAX_COUNT (1024)
 #define GET_TCB_OFFSET_FROM_ID(id) ((id) & 0xFFFFFFFF)
+#define GET_TCB_FROM_THREAD_LINK(thread_link)                          \
+  (TaskControlBlock*)((uint64)(thread_link)-offsetof(TaskControlBlock, \
+                                                     therad_link))
 #define TASK_STACK_POOL_ADDRESS \
   (TASK_TCB_POOL_ADDRESS + sizeof(TaskControlBlock) * TASK_MAX_COUNT)
 #define TASK_STACK_SIZE (BYTE_FROM_KB(8))
@@ -58,6 +61,13 @@ enum TaskPriority {
 };
 
 #define TASK_FLAG_END_TASK (BIT(63llu))
+#define IS_TASK_END_TASK(task) (IS_BIT_SET((task)->flags, 63llu))
+#define TASK_FLAG_SYSTEM (BIT(62llu))
+#define IS_TASK_SYSTEM_TASK(task) (IS_BIT_SET((task)->flags, 62llu))
+#define TASK_FLAG_PROCESS (BIT(61llu))
+#define IS_TASK_PROCESS(task) (IS_BIT_SET((task)->flags, 61llu))
+#define TASK_FLAG_THREAD (BIT(60llu))
+#define IS_TASK_THREAD(task) (IS_BIT_SET((task)->flags, 60llu))
 #define TASK_FLAG_IDLE (BIT(59llu))
 
 #pragma pack(push, 1)
@@ -90,13 +100,21 @@ typedef struct kContextStruct {
 _Static_assert(sizeof(Context) == 8 * TASK_REGISTER_COUNT);
 
 typedef struct kTaskControlBlockStruct {
-  ListLink link;
+  ListLink id_link;
   uint64 flags;
 
   union {
     Context context;
     uint64 reg_context[TASK_REGISTER_COUNT];
   };
+
+  void* memory_addr;
+  size_t memory_size;
+
+  ListLink therad_link;
+  List child_thread_list;
+
+  uint64 parent_process_id;
 
   void* stack_addr;
   uint64 stack_size;
@@ -128,10 +146,11 @@ typedef struct kSchedulerStruct {
 // @param next_context: pointer to context to switch.
 void kSwitchContext(Context* current_context_or_null, Context* next_context);
 
-void kInitializeTCBPool(void);
-TaskControlBlock* kAllocateTCB(void);
-void kFreeTCB(uint64 id);
-TaskControlBlock* kCreateTask(uint64 flags, uint64 entry_point_addr);
+static void kInitializeTCBPool(void);
+static TaskControlBlock* kAllocateTCB(void);
+static void kFreeTCB(uint64 id);
+TaskControlBlock* kCreateTask(uint64 flags, void* memory_addr,
+                              size_t memory_size, uint64 entry_point_addr);
 void kSetUpTask(TaskControlBlock* tcb, uint64 flags, uint64 entry_point_addr,
                 void* stack_addr, uint64 stack_size);
 
@@ -140,10 +159,10 @@ void kInitializeScheduler(void);
 // @param task: task to be running task.
 void kSetRunningTask(TaskControlBlock* task);
 TaskControlBlock* kGetRunningTask(void);
-TaskControlBlock* kGetNextTaskToRun(void);
+static TaskControlBlock* kGetNextTaskToRun(void);
 // Add task to list containing tasks to run.
 // @param task: task to add.
-bool kAddTaskToReadyList(TaskControlBlock* task);
+static bool kAddTaskToReadyList(TaskControlBlock* task);
 // Do scheduling.
 void kSchedule(void);
 // Do scheduling on interrupt. This function MUST be called
@@ -156,7 +175,7 @@ bool kIsProcessorTimeExpired(void);
 // Remove task from ready list(list containing tasks to run) and return it.
 // @param id: id to remove and get.
 // @return pointer to removed tcb from list containing tasks to run.
-TaskControlBlock* kRemoveTaskFromReadyList(uint64 id);
+static TaskControlBlock* kRemoveTaskFromReadyList(uint64 id);
 bool kChangeTaskPriority(uint64 id, enum TaskPriority priority);
 // End specific task.
 // @param id: id of task to end. If you want to end present(alive) task, id's
@@ -178,6 +197,8 @@ size_t kGetTaskCount(void);
 TaskControlBlock* kGetTCBInTCBPool(uint64 offset);
 bool kIsTaskExist(uint64 id);
 uint64 kGetProcessorLoad(void);
+
+static TaskControlBlock* kGetProcessByThread(TaskControlBlock* thread);
 
 void kIdleTask(void);
 void kHaltProcessor(void);

@@ -34,6 +34,7 @@ ShellCommandEntry command_table[] = {
      kConsoleKillTask},
     {"cpuload", "Show Processor Load", kConsoleCPULoad},
     {"testmutex", "Test Mutex Function", kConsoleTestMutex},
+    {"testthread", "Test Thread And Process Function", kTestThread},
 };
 
 void kStartConsoleShell(void) {
@@ -253,7 +254,7 @@ void kTestTask1(void) {
   TaskControlBlock* running_task = kGetRunningTask();
 
   uint8 data = 0;
-  uint32 margin = (running_task->link.id & 0xFFFFFFFF) % 10;
+  uint32 margin = (running_task->id_link.id & 0xFFFFFFFF) % 10;
   int i = 0, x = 0, y = 0;
   for (int _ = 0; _ < 2000; ++_) {
     switch (i) {
@@ -294,7 +295,7 @@ void kTestTask2(void) {
   TaskControlBlock* running_task = kGetRunningTask();
   const char data[4] = {'-', '\\', '|', '/'};
 
-  uint32 offset = (running_task->link.id & 0xFFFFFFFF) * 2;
+  uint32 offset = (running_task->id_link.id & 0xFFFFFFFF) * 2;
   offset = CONSOLE_WIDTH * CONSOLE_HEIGHT -
            (offset % (CONSOLE_WIDTH * CONSOLE_HEIGHT));
 
@@ -327,7 +328,8 @@ static void kConsoleCreateTestTask(const char* parameter_buffer) {
     case 1: {
       int i;
       for (i = 0; i < count; ++i) {
-        if (!kCreateTask(kTaskPriorityLow, (uint64)kTestTask1)) {
+        if (!kCreateTask(kTaskPriorityLow | TASK_FLAG_THREAD, 0, 0,
+                         (uint64)kTestTask1)) {
           break;
         }
       }
@@ -336,7 +338,8 @@ static void kConsoleCreateTestTask(const char* parameter_buffer) {
     case 2: {
       int i;
       for (i = 0; i < count; ++i) {
-        if (!kCreateTask(kTaskPriorityLow, (uint64)kTestTask2)) {
+        if (!kCreateTask(kTaskPriorityLow | TASK_FLAG_THREAD, 0, 0,
+                         (uint64)kTestTask2)) {
           break;
         }
       }
@@ -383,19 +386,22 @@ static void kConsoleShowTaskList(const char* parameter_buffer) {
   int count = 0;
   for (int i = 0; i < TASK_MAX_COUNT; ++i) {
     TaskControlBlock* tcb = kGetTCBInTCBPool(i);
-    if (tcb->flags & TASK_FLAG_END_TASK) {
-      continue;
-    }
 
     if (do_only_print_present) {
-      if (IS_TASK_PRESENT(tcb)) {
-        printf("[%d] Task ID[%p], Priority[%d], Flags[%p]\n", 1 + count++,
-               GET_TCB_OFFSET_FROM_ID(tcb->link.id), GET_TASK_PRIORITY(tcb),
-               tcb->flags);
+      if (IS_TASK_PRESENT(tcb) && !IS_TASK_END_TASK(tcb)) {
+        printf("[%d] Task ID[%p], Priority[%d], Flags[%p], Thread[%d]\n",
+               1 + count++, GET_TCB_OFFSET_FROM_ID(tcb->id_link.id),
+               GET_TASK_PRIORITY(tcb), tcb->flags,
+               kGetListCount(&tcb->child_thread_list));
+        printf("    Parent PID[%p], Memory Address[%p], Size[%p]\n",
+               tcb->parent_process_id, tcb->memory_addr, tcb->memory_size);
       }
     } else {
-      printf("[%d] Task ID[%p], Priority[%d], Flags[%p]\n", 1 + count++,
-             tcb->link.id, GET_TASK_PRIORITY(tcb), tcb->flags);
+      printf("[%d] Task ID[%p], Priority[%d], Flags[%p], Thread[%d]\n",
+             1 + count++, tcb->id_link.id, GET_TASK_PRIORITY(tcb), tcb->flags,
+             kGetListCount(&tcb->child_thread_list));
+      printf("    Parent PID[%p], Memory Address[%p], Size[%p]\n",
+             tcb->parent_process_id, tcb->memory_addr, tcb->memory_size);
     }
 
     if (count % 10 == 0) {
@@ -432,7 +438,7 @@ static void kConsoleTaskInfo(const char* parameter_buffer) {
       "        GS: %p, FS: %p, ES: %p, DS: %p, CS: %p, SS: %p\n"
       "    }\n"
       "    stack_addr = %p\n",
-      tcb->link.id, tcb, tcb->flags, tcb->context.gs, tcb->context.fs,
+      tcb->id_link.id, tcb, tcb->flags, tcb->context.gs, tcb->context.fs,
       tcb->context.es, tcb->context.ds, tcb->context.cs, tcb->context.ss,
       tcb->stack_addr);
 }
@@ -451,9 +457,11 @@ static void kConsoleKillTask(const char* parameter_buffer) {
 
   uint64 task_id;
   if (!memcmp(param, "all", 3)) {
-    for (int i = 2; i < TASK_MAX_COUNT; ++i) {
-      if (kIsTaskExist(i)) {
-        kEndTask(TASK_ID_PRESENT | i);
+    for (int i = 0; i < TASK_MAX_COUNT; ++i) {
+      TaskControlBlock* tcb = kGetTCBInTCBPool(i);
+      const uint64 id = tcb->id_link.id;
+      if (IS_TASK_PRESENT(tcb) && !IS_TASK_SYSTEM_TASK(tcb)) {
+        kEndTask(id);
       }
     }
     return;
@@ -494,7 +502,7 @@ void kConsolePrintNumberTask(void) {
   }
   for (int i = 0; i < 5; ++i) {
     kLockMutex(&mutex);
-    printf("Task ID [%p] Value[%d]\n", kGetRunningTask()->link.id, adder++);
+    printf("Task ID [%p] Value[%d]\n", kGetRunningTask()->id_link.id, adder++);
     kUnlockMutex(&mutex);
     for (int j = 0; j < 30000; ++j)
       ;
@@ -510,10 +518,26 @@ static void kConsoleTestMutex(const char* parameter_buffer) {
   adder = 1;
   kInitializeMutex(&mutex);
   for (int i = 0; i < 3; ++i) {
-    kCreateTask(kTaskPriorityLow, (uint64)kConsolePrintNumberTask);
+    kCreateTask(kTaskPriorityLow | TASK_FLAG_THREAD, 0, 0,
+                (uint64)kConsolePrintNumberTask);
   }
   printf("Wit Until %d Task End\n", 3);
   getch();
+}
+
+static void kCreateThreadTask(void) {
+  for (int i = 0; i < 3; ++i) {
+    kCreateTask(kTaskPriorityLow | TASK_FLAG_THREAD, 0, 0, (uint64)kTestTask2);
+  }
+  while (1) {
+    kSleep(1);
+  }
+}
+
+static void kTestThread(const char* parameter_buffer) {
+  TaskControlBlock* process =
+      kCreateTask(kTaskPriorityLow | TASK_FLAG_PROCESS, (void*)0xEEEEEEEE,
+                  0x1000, (uint64)kCreateThreadTask);
 }
 
 #undef MAKE_LIST_AND_PARAM

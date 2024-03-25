@@ -33,7 +33,7 @@ inline bool kCompareAndSet(volatile uint8* dst, uint8 expected,
 
 void kLockMutex(Mutex* mutex) {
   if (!kCompareAndSet(&mutex->is_lock, false, true)) {
-    if (mutex->task_id == kGetRunningTask()->link.id) {
+    if (mutex->task_id == kGetRunningTask()->id_link.id) {
       ++mutex->lock_count;
       return;
     }
@@ -44,11 +44,11 @@ void kLockMutex(Mutex* mutex) {
   }
 
   mutex->lock_count = 1;
-  mutex->task_id = kGetRunningTask()->link.id;
+  mutex->task_id = kGetRunningTask()->id_link.id;
 }
 
 void kUnlockMutex(Mutex* mutex) {
-  if (!mutex->is_lock || mutex->task_id != kGetRunningTask()->link.id) {
+  if (!mutex->is_lock || mutex->task_id != kGetRunningTask()->id_link.id) {
     return;
   }
 

@@ -43,5 +43,6 @@ static void kConsoleTaskInfo(const char* parameter_buffer);
 static void kConsoleKillTask(const char* parameter_buffer);
 static void kConsoleCPULoad(const char* parameter_buffer);
 static void kConsoleTestMutex(const char* parameter_buffer);
+static void kTestThread(const char* parameter_buffer);
 
 #endif
