@@ -25,3 +25,22 @@ inline uint64 kReadTSC(void) {
   asm volatile("rdtsc;" : "=a"(low), "=d"(high) :);
   return ((uint64)high << 32) | low;
 }
+
+inline void kInitializeFPU(void) { asm volatile("finit;"); }
+
+inline void kSaveFPUContext(void* fpu_context) {
+  asm volatile("fxsave [%[fpu_ctx]];" : : [fpu_ctx] "D"(fpu_context));
+}
+
+inline void kLoadFPUContext(void* fpu_context) {
+  asm volatile("fxrstor [%[fpu_ctx]]" ::[fpu_ctx] "D"(fpu_context));
+}
+
+inline void kSetTS(void) {
+  asm volatile(
+      "mov rax, cr0;"
+      "or rax, 0x08;"
+      "mov cr0, rax;");
+}
+
+inline void kClearTS(void) { asm volatile("clts"); }

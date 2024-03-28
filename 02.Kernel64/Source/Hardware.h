@@ -12,4 +12,11 @@ uint8 kGetPortByte(uint16 port);
 void kSetPortByte(uint16 port, uint8 data);
 
 uint64 kReadTSC(void);
+
+void kInitializeFPU(void);
+void kSaveFPUContext(void* fpu_context);
+void kLoadFPUContext(void* fpu_context);
+
+void kSetTS(void);
+void kClearTS(void);
 #endif
