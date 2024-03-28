@@ -11,7 +11,7 @@ kSwitchAndExecute64bitKernel:
   ; Set PAE bit on CR4
   ; Check out: https://en.wikipedia.org/wiki/Control_register#CR4
   mov eax, cr4
-  or eax, 0x20 ; Set PAE bit (5 bit)
+  or eax, 0x620 ; Set PAE(5) bit and OSXMMEXCPT(10) bit
   mov cr4, eax
 
   ; Set PML4 addr on CR3
@@ -27,10 +27,11 @@ kSwitchAndExecute64bitKernel:
   wrmsr ; Write Model Specific Register
 
   ; Set NW=0, CD=0, PG=1 on CR0 for enabling cache and paging
+  ; Set TS=1, EM=0, MP=1 on CR0 for enabling FPU
   ; Check out: https://en.wikipedia.org/wiki/Control_register#CR0
   mov eax, cr0
-  or eax, 0xE0000000 ; Set NW bit (29 bit) and CD bit (30 bit), PG bit (31 bit)
-  xor eax, 0x60000000 ; Set NW bit, CD bit to zero
+  or eax, 0xE000000E ; Set NW(29) bit and CD(30) bit, PG(31) bit, TS(3) bit, EM(2) bit, MP(1) bit
+  xor eax, 0x60000004 ; Set NW(29) bit, CD(30) bit, NM(2) bit to zero
   mov cr0, eax
 
   jmp 0x08:0x200000
