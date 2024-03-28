@@ -522,7 +522,7 @@ static void kConsoleTestMutex(const char* parameter_buffer) {
     kCreateTask(kTaskPriorityLow | TASK_FLAG_THREAD, 0, 0,
                 (uint64)kConsolePrintNumberTask);
   }
-  printf("Wit Until %d Task End\n", 3);
+  printf("Wait Until %d Task End\n", 3);
   getch();
 }
 
