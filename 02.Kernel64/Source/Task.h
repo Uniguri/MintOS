@@ -103,11 +103,6 @@ typedef struct kTaskControlBlockStruct {
   ListLink id_link;
   uint64 flags;
 
-  union {
-    Context context;
-    uint64 reg_context[TASK_REGISTER_COUNT];
-  };
-
   void* memory_addr;
   size_t memory_size;
 
@@ -116,9 +111,20 @@ typedef struct kTaskControlBlockStruct {
 
   uint64 parent_process_id;
 
+  union {
+    Context context;
+    uint64 reg_context[TASK_REGISTER_COUNT];
+  };
   void* stack_addr;
   uint64 stack_size;
+
+  char padding_0[7];
+
+  bool fpu_used;
+  uint64 fpu_context[512 / 8];
 } TaskControlBlock;
+_Static_assert(offsetof(TaskControlBlock, fpu_context) % 16 == 0);
+_Static_assert(sizeof(TaskControlBlock) % 16 == 0);
 
 typedef struct kTCBPollManagerStruct {
   TaskControlBlock* tcb;
@@ -137,6 +143,8 @@ typedef struct kSchedulerStruct {
 
   uint64 processor_load;
   uint64 spend_processor_time_ind_idle_task;
+
+  uint64 last_fpu_used_task_id;
 } Scheduler;
 #pragma pack(pop)
 
@@ -203,5 +211,8 @@ static TaskControlBlock* kGetProcessByThread(TaskControlBlock* thread);
 void kIdleTask(void);
 void kHaltProcessor(void);
 void kHaltProcessorByLoad(void);
+
+uint64 kGetLaskFPUUsedTaskID(void);
+void kSetLastFPUUsedTaskID(uint64 task_id);
 
 #endif

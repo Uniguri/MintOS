@@ -10,6 +10,8 @@ extern kCommonInterruptHandler
 extern kKeyboardHandler
 ; void kTimerHandler(int vector_number)
 extern kTimerHandler
+; void kDeviceNotAvailableHandler(int vector_number)
+extern kDeviceNotAvailableHandler
 
 ; ISR(Interrupt Service Routin) for Exception.
 global kISRDivideError, kISRDebug, kISRNMI, kISRBreakPoint, kISROverflow
@@ -172,8 +174,7 @@ kISRDeviceNotAvailable:
 
     ; Call handler with exception number.
     mov rdi, 7
-    mov rsi, 0
-    call kCommonExceptionHandler
+    call kDeviceNotAvailableHandler
 
     LOAD_CONTEXT
     iretq

@@ -1,6 +1,7 @@
 #include "Task.h"
 
 #include "Descriptor.h"
+#include "Hardware.h"
 #include "Macro.h"
 #include "Memory.h"
 #include "Synchronization.h"
@@ -92,6 +93,7 @@ TaskControlBlock* kCreateTask(uint64 flags, void* memory_addr,
               TASK_STACK_SIZE * GET_TCB_OFFSET_FROM_ID(task->id_link.id));
   kSetUpTask(task, flags, entry_point_addr, stack_addr, TASK_STACK_SIZE);
   kInitializeList(&task->child_thread_list);
+  task->fpu_used = false;
 
   prev_flag = kLockForSystemData();
   kAddTaskToReadyList(task);
@@ -145,6 +147,8 @@ void kInitializeScheduler(void) {
 
   scheduler.processor_load = 0;
   scheduler.spend_processor_time_ind_idle_task = 0;
+
+  scheduler.last_fpu_used_task_id = TASK_INVALID_ID;
 }
 
 inline void kSetRunningTask(TaskControlBlock* task) {
@@ -210,6 +214,12 @@ void kSchedule(void) {
         TASK_PROCESSOR_TIME - scheduler.processor_time;
   }
 
+  if (scheduler.last_fpu_used_task_id != task_to_run->id_link.id) {
+    kSetTS();
+  } else {
+    kClearTS();
+  }
+
   // If prev task is to end, we don't need to save context of prev task (current
   // context).
   if (prev_task->flags & TASK_FLAG_END_TASK) {
@@ -255,6 +265,12 @@ bool kScheduleInInterrupt(void) {
     kAddTaskToReadyList(prev_task);
   }
   kUnlockForSystemData(prev_flag);
+
+  if (scheduler.last_fpu_used_task_id != task_to_run->id_link.id) {
+    kSetTS();
+  } else {
+    kClearTS();
+  }
 
   // Switch context by copying.
   memcpy(ist_context_addr, &task_to_run->context, sizeof(Context));
@@ -415,6 +431,14 @@ TaskControlBlock* kGetProcessByThread(TaskControlBlock* thread) {
   }
 
   return process;
+}
+
+inline uint64 kGetLaskFPUUsedTaskID(void) {
+  return scheduler.last_fpu_used_task_id;
+}
+
+void kSetLastFPUUsedTaskID(uint64 task_id) {
+  scheduler.last_fpu_used_task_id = task_id;
 }
 
 void kIdleTask(void) {
