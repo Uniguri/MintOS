@@ -35,6 +35,7 @@ ShellCommandEntry command_table[] = {
     {"cpuload", "Show Processor Load", kConsoleCPULoad},
     {"testmutex", "Test Mutex Function", kConsoleTestMutex},
     {"testthread", "Test Thread And Process Function", kTestThread},
+    {"testpie", "Test PIE Calculation", kTestPIE},
 };
 
 void kStartConsoleShell(void) {
@@ -538,6 +539,58 @@ static void kTestThread(const char* parameter_buffer) {
   TaskControlBlock* process =
       kCreateTask(kTaskPriorityLow | TASK_FLAG_PROCESS, (void*)0xEEEEEEEE,
                   0x1000, (uint64)kCreateThreadTask);
+}
+
+static volatile uint64 random_value = 0;
+
+uint64 kRandom(void) {
+  random_value = (random_value * 412153 + 5571031) >> 16;
+  return random_value;
+}
+
+static void kFPUTestTask(void) {
+  const char data[4] = {'-', '\\', '|', '/'};
+  TaskControlBlock* running_task = kGetRunningTask();
+  Character* screen = (Character*)CONSOLE_VIDEO_MEMORY_ADDRESS;
+  int offset = (running_task->id_link.id & 0xFFFFFFFF) * 2;
+  offset = CONSOLE_WIDTH * CONSOLE_HEIGHT -
+           (offset % (CONSOLE_BACKGROUND_WHITE * CONSOLE_HEIGHT));
+
+  uint64 count = 0;
+  while (1) {
+    double value1 = 1;
+    double value2 = 1;
+    for (int i = 0; i < 10; ++i) {
+      uint64 rand_val = kRandom();
+      value1 *= (double)rand_val;
+      value2 *= (double)rand_val;
+
+      kSleep(1);
+
+      rand_val = kRandom();
+      value1 /= (double)rand_val;
+      value2 /= (double)rand_val;
+    }
+
+    if (value1 != value2) {
+      printf("Value is not same [%f] != [%f]\n", value1, value2);
+      break;
+    }
+    ++count;
+
+    screen[offset].charactor = data[count % 4];
+    screen[offset].attribute = (offset % 15) + 1;
+  }
+}
+
+static void kTestPIE(const char* parameter_buffer) {
+  const double res = (double)355 / 113;
+  printf("355 / 113 = %d.%d%d\n", (uint64)res, (uint64)(res * 10) % 10,
+         (uint64)(res * 100) % 10);
+  for (int i = 0; i < 100; ++i) {
+    kCreateTask(kTaskPriorityLow | TASK_FLAG_THREAD, 0, 0,
+                (uint64)kFPUTestTask);
+  }
 }
 
 #undef MAKE_LIST_AND_PARAM
