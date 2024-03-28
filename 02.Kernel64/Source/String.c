@@ -88,6 +88,23 @@ int vsnprintf(char* buffer, size_t n, const char* format, va_list va) {
           break;
         }
 
+        case 'f': {
+          double val = (double)va_arg(va, double);
+          val += 0.005;
+          buffer[idx] = '0' + (uint64)(val * 100) % 10;
+          buffer[idx + 1] = '0' + (uint64)(val * 10) % 10;
+          buffer[idx + 2] = '.';
+          int k = 0;
+          while ((uint64)val != 0 || k == 0) {
+            buffer[idx + 3 + k] = '0' + (uint64)(val) % 10;
+            val /= 10;
+            ++k;
+          }
+          buffer[idx + 3 + k] = 0;
+          ReverseString(buffer + idx);
+          idx += 3 + k;
+        }
+
         default: {
           buffer[idx++] = format[i];
           break;
