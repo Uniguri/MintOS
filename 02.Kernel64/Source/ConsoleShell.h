@@ -43,7 +43,12 @@ static void kConsoleTaskInfo(const char* parameter_buffer);
 static void kConsoleKillTask(const char* parameter_buffer);
 static void kConsoleCPULoad(const char* parameter_buffer);
 static void kConsoleTestMutex(const char* parameter_buffer);
-static void kTestThread(const char* parameter_buffer);
-static void kTestPIE(const char* parameter_buffer);
+static void kConsoleTestThread(const char* parameter_buffer);
+static void kConsoleTestRandom(const char* parameter_buffer);
+static void kConsoleTestPIE(const char* parameter_buffer);
+static void kConsoleShowDyanmicMemoryInformation(const char* parameter_buffer);
+static void kConsoleTestSequentialAllocation(const char* parameter_buffer);
+static void kConsoleRandomAllocationTask(void);
+static void kConsoleTestRandomAllocation(const char* parameter_buffer);
 
 #endif

@@ -1,6 +1,7 @@
 #include "ConsoleShell.h"
 
 #include "Console.h"
+#include "DynamicMemory.h"
 #include "Hardware.h"
 #include "Interrupt.h"
 #include "Keyboard.h"
@@ -34,8 +35,15 @@ ShellCommandEntry command_table[] = {
      kConsoleKillTask},
     {"cpuload", "Show Processor Load", kConsoleCPULoad},
     {"testmutex", "Test Mutex Function", kConsoleTestMutex},
-    {"testthread", "Test Thread And Process Function", kTestThread},
-    {"testpie", "Test PIE Calculation", kTestPIE},
+    {"testthread", "Test Thread And Process Function", kConsoleTestThread},
+    {"testrandom", "Test random", kConsoleTestRandom},
+    {"testpie", "Test PIE Calculation", kConsoleTestPIE},
+    {"dynamicmeminfo", "Show Dyanmic Memory Information",
+     kConsoleShowDyanmicMemoryInformation},
+    {"testseqalloc", "Test Sequential Allocation & Free",
+     kConsoleTestSequentialAllocation},
+    {"testranalloc", "Test Random Allocation & Free",
+     kConsoleTestRandomAllocation},
 };
 
 void kStartConsoleShell(void) {
@@ -173,6 +181,15 @@ static void kConsoleHelp(const char* parameter_buffer) {
     kGetCursor(&cursor_x, &cursor_y);
     kSetCursor(max_command_length, cursor_y);
     printf("  - %s\n", command_table[i].help);
+
+    if (i != 0 && i % 20 == 0) {
+      printf("Press any key to continue... ('q' is exit) : ");
+      if (getch() == 'q') {
+        printf("\n");
+        break;
+      }
+      printf("\n");
+    }
   }
 }
 static void kConsoleClear(const char* parameter_buffer) {
@@ -535,7 +552,7 @@ static void kCreateThreadTask(void) {
   }
 }
 
-static void kTestThread(const char* parameter_buffer) {
+static void kConsoleTestThread(const char* parameter_buffer) {
   TaskControlBlock* process =
       kCreateTask(kTaskPriorityLow | TASK_FLAG_PROCESS, (void*)0xEEEEEEEE,
                   0x1000, (uint64)kCreateThreadTask);
@@ -544,8 +561,15 @@ static void kTestThread(const char* parameter_buffer) {
 static volatile uint64 random_value = 0;
 
 uint64 kRandom(void) {
-  random_value = (random_value * 412153 + 5571031) >> 16;
+  random_value = (random_value * 1103515245 + 12345) % 2147483648;
   return random_value;
+}
+
+static void kConsoleTestRandom(const char* parameter_buffer) {
+  for (int i = 0; i < 100; ++i) {
+    printf("%d, ", kRandom());
+  }
+  printf("\n");
 }
 
 static void kFPUTestTask(void) {
@@ -583,13 +607,117 @@ static void kFPUTestTask(void) {
   }
 }
 
-static void kTestPIE(const char* parameter_buffer) {
+static void kConsoleTestPIE(const char* parameter_buffer) {
   const double res = (double)355 / 113;
   printf("355 / 113 = %d.%d%d\n", (uint64)res, (uint64)(res * 10) % 10,
          (uint64)(res * 100) % 10);
   for (int i = 0; i < 100; ++i) {
     kCreateTask(kTaskPriorityLow | TASK_FLAG_THREAD, 0, 0,
                 (uint64)kFPUTestTask);
+  }
+}
+
+static void kConsoleShowDyanmicMemoryInformation(const char* parameter_buffer) {
+  uint64 start_addr;
+  size_t total_size, meta_data_size, used_memory_size;
+  kGetDynamicMemoryInformation(&start_addr, &total_size, &meta_data_size,
+                               &used_memory_size);
+
+  printf("============ Dynamic Memory Information ============\n");
+  printf("Start Address: [%p]\n", start_addr);
+  printf("Total Size: [%p] bytes, [%d] MB\n", total_size,
+         MB_FROM_BYTE(total_size));
+  printf("Meta Size: [%p] bytes, [%d] KB\n", meta_data_size,
+         KB_FROM_BYTE(meta_data_size));
+  printf("Used Size: [%p] bytes, [%d] KB\n", used_memory_size,
+         KB_FROM_BYTE(used_memory_size));
+}
+
+static void kConsoleTestSequentialAllocation(const char* parameter_buffer) {
+  DynamicMemory* mem = kGetDynamicMemoryManager();
+  for (int i = 0; i < mem->max_level; ++i) {
+    for (int j = 0; j < (mem->smallest_block_count >> i); ++j) {
+      uint64* buffer = kAllocateMemory(DYNAMIC_MEMORY_MIN_SIZE << i);
+      if (!buffer) {
+        printf("\nAllocation Fail\n");
+        return;
+      }
+
+      for (int k = 0; k < (DYNAMIC_MEMORY_MIN_SIZE << i) / 8; ++k) {
+        buffer[k] = k;
+      }
+      for (int k = 0; k < (DYNAMIC_MEMORY_MIN_SIZE << i) / 8; ++k) {
+        if (buffer[k] != k) {
+          printf("\nCompare Fail\n");
+          return;
+        }
+      }
+
+      printf(".");
+    }
+
+    for (int j = 0; j < (mem->smallest_block_count >> i); ++j) {
+      if (kFreeMemory((void*)(mem->start_address +
+                              (DYNAMIC_MEMORY_MIN_SIZE << i) * j)) == false) {
+        printf("\nFree Fail\n");
+        return;
+      }
+      printf(".");
+    }
+    printf("\n");
+  }
+}
+
+static void kConsoleRandomAllocationTask(void) {
+  TaskControlBlock* task = kGetRunningTask();
+  const int y = (task->id_link.id) % 15 + 9;
+  for (int i = 0; i < 10; ++i) {
+    char buffer[200];
+    size_t mem_size;
+    uint8* alloc_buf;
+    do {
+      mem_size = ((kRandom() % (32 * 1024)) + 1) * 1024;
+      alloc_buf = kAllocateMemory(mem_size);
+
+      if (!alloc_buf) {
+        kSleep(1);
+      }
+    } while (!alloc_buf);
+    snprintf(buffer, 200, "|Address: [%p] Size: [%p] Allocation Success      ",
+             alloc_buf, mem_size);
+    kPrintStringXY(20, y, buffer);
+    kSleep(200);
+
+    snprintf(buffer, 200, "|Address: [%p] Size: [%p] Data Write...           ",
+             alloc_buf, mem_size);
+    kPrintStringXY(20, y, buffer);
+    for (int j = 0; j < mem_size / 2; ++j) {
+      alloc_buf[j] = kRandom() & 0xFF;
+      alloc_buf[j + mem_size / 2] = alloc_buf[j];
+    }
+    kSleep(200);
+
+    snprintf(buffer, 200, "|Address: [%p] Size: [%p] Data Verify...          ",
+             alloc_buf, mem_size);
+    kPrintStringXY(20, y, buffer);
+    for (int j = 0; j < mem_size / 2; ++j) {
+      if (alloc_buf[j] != alloc_buf[j + mem_size / 2]) {
+        printf("Task ID[%p] Verify Fail\n", task->id_link.id);
+        kExitTask();
+      }
+    }
+
+    kFreeMemory(alloc_buf);
+    kSleep(200);
+  }
+
+  kExitTask();
+}
+
+static void kConsoleTestRandomAllocation(const char* parameter_buffer) {
+  for (int i = 0; i < 1000; ++i) {
+    kCreateTask(kTaskPriorityLowest | TASK_FLAG_THREAD, 0, 0,
+                (uint64)kConsoleRandomAllocationTask);
   }
 }
 
