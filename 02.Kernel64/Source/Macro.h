@@ -4,8 +4,8 @@
 #define BIT(x) (1llu << (x))
 #define GET_BIT(x, bit) ((x) & BIT(bit))
 #define IS_BIT_SET(x, bit) ((GET_BIT((x), bit)) != 0)
-#define SET_BIT(x, bit) ((x) | BIT(bit))
-#define CLEAR_BIT(x, bit) ((x) ^ GET_BIT(x, bit))
+#define SET_BIT(x, bit) ((x) |= BIT(bit))
+#define CLEAR_BIT(x, bit) ((x) &= ~BIT(bit))
 
 #define KB_FROM_BYTE(x) ((size_t)(x) >> 10llu)
 #define MB_FROM_BYTE(x) ((size_t)KB_FROM_BYTE((x)) >> 10llu)
