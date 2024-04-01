@@ -1,6 +1,7 @@
 #include "Console.h"
 #include "ConsoleShell.h"
 #include "Descriptor.h"
+#include "DynamicMemory.h"
 #include "Interrupt.h"
 #include "Keyboard.h"
 #include "Memory.h"
@@ -44,6 +45,10 @@ void Main(void) {
   ++cursor_y;
   kInitializeScheduler();
   kInitializePIT(MILLISEC_TO_COUNT(1), 1);
+
+  printf("Dynamic Memory Initialize...................[Pass]\n");
+  ++cursor_y;
+  kInitializeDynamicMemory();
 
   printf("Keyboard Activate And Queue Initialize......[    ]");
   kSetCursor(45, cursor_y++);
