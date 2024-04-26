@@ -50,5 +50,8 @@ static void kConsoleShowDyanmicMemoryInformation(const char* parameter_buffer);
 static void kConsoleTestSequentialAllocation(const char* parameter_buffer);
 static void kConsoleRandomAllocationTask(void);
 static void kConsoleTestRandomAllocation(const char* parameter_buffer);
+static void kShowHDDInformation(const char* parameter_buffer);
+static void kReadSector(const char* parameter_buffer);
+static void kWriteSector(const char* parameter_buffer);
 
 #endif

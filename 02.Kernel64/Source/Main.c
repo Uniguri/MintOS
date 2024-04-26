@@ -2,6 +2,7 @@
 #include "ConsoleShell.h"
 #include "Descriptor.h"
 #include "DynamicMemory.h"
+#include "HardDisk.h"
 #include "Interrupt.h"
 #include "Keyboard.h"
 #include "Memory.h"
@@ -65,6 +66,14 @@ void Main(void) {
   kEnableInterrupt();
   kSetCursor(45, cursor_y++);
   printf("Pass\n");
+
+  printf("HDD Initialize..............................[    ]");
+  kSetCursor(45, cursor_y++);
+  if (kInitializeHDD()) {
+    printf("Pass\n");
+  } else {
+    printf("Fail\n");
+  }
 
   kCreateTask(kTaskPriorityLowest | TASK_FLAG_THREAD | TASK_FLAG_SYSTEM |
                   TASK_FLAG_IDLE,

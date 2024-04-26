@@ -2,6 +2,7 @@
 
 #include "Console.h"
 #include "DynamicMemory.h"
+#include "HardDisk.h"
 #include "Hardware.h"
 #include "Interrupt.h"
 #include "Keyboard.h"
@@ -44,6 +45,11 @@ ShellCommandEntry command_table[] = {
      kConsoleTestSequentialAllocation},
     {"testranalloc", "Test Random Allocation & Free",
      kConsoleTestRandomAllocation},
+    {"hddinfo", "Show HDD Information", kShowHDDInformation},
+    {"readsector", "Read HDD Sector, ex)readsector 0(LBA) 10(count)",
+     kReadSector},
+    {"writesector", "Write HDD Sector, ex)writesector 0(LBA) 10(count)",
+     kWriteSector},
 };
 
 void kStartConsoleShell(void) {
@@ -721,5 +727,142 @@ static void kConsoleTestRandomAllocation(const char* parameter_buffer) {
   }
 }
 
+static void kShowHDDInformation(const char* parameter_buffer) {
+  HDDInformation hdd;
+  if (!kReadHDDInformation(true, true, &hdd)) {
+    printf("HDD Information Read Fail\n");
+    return;
+  }
+
+  char buffer[0x200];
+  printf("============ Primary Master HDD Information ============\n");
+  memcpy(buffer, hdd.model_number, sizeof(hdd.model_number));
+  buffer[sizeof(hdd.model_number) - 1] = 0;
+  printf("Model Number:\t %s\n", buffer);
+  memcpy(buffer, hdd.serial_number, sizeof(hdd.serial_number));
+  buffer[sizeof(hdd.serial_number) - 1] = 0;
+  printf("Model Number:\t %s\n", buffer);
+  printf("Head Count:\t %d\n", hdd.number_of_head);
+  printf("Cylinder Count:\t %d\n", hdd.number_of_cylinder);
+  printf("Sector Count:\t %d\n", hdd.number_of_sector_per_cylinder);
+  printf("Total Sector:\t %d Sector, %d MB\n", hdd.total_sectors,
+         hdd.total_sectors / 2 / 1024);
+}
+
+static void kReadSector(const char* parameter_buffer) {
+  MAKE_LIST_AND_PARAM(parameter_buffer);
+
+  if (!GET_NEXT_PARAM()) {
+    goto ERROR;
+  }
+  const uint32 lba = Int32FromDecimalString(param);
+
+  if (!GET_NEXT_PARAM()) {
+    goto ERROR;
+  }
+  const int sector_count = Int32FromDecimalString(param);
+
+  char* buffer = kAllocateMemory(sector_count * 512);
+  if (kReadHDDSector(true, true, lba, sector_count, buffer) == sector_count) {
+    printf("LBA [%d], [%d] Sector Read Success", lba, sector_count);
+    bool do_exit = false;
+    for (int i = 0; i < sector_count; ++i) {
+      for (int j = 0; j < 512; ++j) {
+        if (!(j == 0 && i == 0) && j % 256 == 0) {
+          printf("\nPress any key to continue... ('q' is exit): ");
+          if (getch() == 'q') {
+            do_exit = true;
+            break;
+          }
+        }
+        if (j % 16 == 0) {
+          printf("\n[LBA:%d, Offset:%d]\t ", lba + i, j);
+        }
+
+        const int data = buffer[i * 512 + j] & 0xFF;
+        if (data < 16) {
+          printf("0");
+        }
+        printf("%x ", data);
+      }
+
+      if (do_exit) {
+        break;
+      }
+    }
+    printf("\n");
+  } else {
+    printf("Read Fail\n");
+  }
+  kFreeMemory(buffer);
+  return;
+ERROR:
+  printf("ex) readsector 0(LBA) 10(count)\n");
+  return;
+}
+
+static void kWriteSector(const char* parameter_buffer) {
+  static uint32 write_count = 0;
+  MAKE_LIST_AND_PARAM(parameter_buffer);
+
+  if (!GET_NEXT_PARAM()) {
+    goto ERROR;
+  }
+  const uint32 lba = Int32FromDecimalString(param);
+
+  if (!GET_NEXT_PARAM()) {
+    goto ERROR;
+  }
+  const int sector_count = Int32FromDecimalString(param);
+
+  ++write_count;
+  char* buffer = kAllocateMemory(sector_count * 512);
+  for (int i = 0; i < sector_count; ++i) {
+    for (int j = 0; j < 512; j += 8) {
+      *(uint32*)&buffer[i * 512 + j] = lba + i;
+      *(uint32*)&buffer[i * 512 + j + 4] = write_count;
+    }
+  }
+
+  if (kWriteHDDSector(true, true, lba, sector_count, buffer) != sector_count) {
+    printf("Write fail\n");
+    kFreeMemory(buffer);
+    return;
+  }
+  printf("LBA [%d], [%d] Sector Write Success", lba, sector_count);
+
+  bool do_exit = false;
+  for (int i = 0; i < sector_count; ++i) {
+    for (int j = 0; j < 512; ++j) {
+      if (!(j == 0 && i == 0) && j % 256 == 0) {
+        printf("\nPress any key to continue... ('q' is exit): ");
+        if (getch() == 'q') {
+          do_exit = true;
+          break;
+        }
+      }
+      if (j % 16 == 0) {
+        printf("\n[LBA:%d, Offset:%d]\t ", lba + i, j);
+      }
+
+      const int data = buffer[i * 512 + j] & 0xFF;
+      if (data < 16) {
+        printf("0");
+      }
+      printf("%x ", data);
+    }
+
+    if (do_exit) {
+      break;
+    }
+  }
+  printf("\n");
+
+  kFreeMemory(buffer);
+  return;
+ERROR:
+  printf("ex) writesector 0(LBA) 10(count)\n");
+  return;
+}
 #undef MAKE_LIST_AND_PARAM
 #undef GET_NEXT_PARAM
