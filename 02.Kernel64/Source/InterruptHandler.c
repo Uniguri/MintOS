@@ -1,6 +1,7 @@
 #include "InterruptHandler.h"
 
 #include "Console.h"
+#include "HardDisk.h"
 #include "Hardware.h"
 #include "Keyboard.h"
 #include "PIC.h"
@@ -114,4 +115,25 @@ void kDeviceNotAvailableHandler(int vector_number) {
   }
 
   kSetLastFPUUsedTaskID(cur_task->id_link.id);
+}
+
+void kHDDHandler(int vector_number) {
+  char buffer[] = "[INT:  , ]";
+  static int hdd_interrupt_count = 0;
+
+  buffer[5] = '0' + vector_number / 10;
+  buffer[6] = '0' + vector_number % 10;
+  buffer[8] = '0' + hdd_interrupt_count;
+  if (++hdd_interrupt_count > 10) {
+    hdd_interrupt_count = 0;
+  }
+  kPrintStringXY(70, 0, buffer);
+
+  if (vector_number - PIC_IRQ_START_VECTOR == 14) {
+    kSetHDDInterruptFlag(true, true);
+  } else {
+    kSetHDDInterruptFlag(false, true);
+  }
+
+  kSendEOIToPIC(vector_number - PIC_IRQ_START_VECTOR);
 }
