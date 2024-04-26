@@ -53,4 +53,4 @@ clean:
 	make -C 01.Kernel32 clean
 	make -C 02.Kernel64 clean
 	make -C 04.Utility clean
-	rm -f Disk.img
+	rm -f Disk.img HDD.img
