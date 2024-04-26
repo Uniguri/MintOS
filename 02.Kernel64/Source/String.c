@@ -71,13 +71,13 @@ int vsnprintf(char* buffer, size_t n, const char* format, va_list va) {
         case 'x':
         case 'X': {
           const int32 val = (int32)va_arg(va, int32);
-          idx += HexStringFromInt64(val, &buffer[idx]);
+          idx += HexStringFromInt64(val, &buffer[idx], false);
           break;
         }
 
         case 'p': {
           const uint64 val = (uint64)va_arg(va, uint64);
-          idx += HexStringFromUint64(val, &buffer[idx]);
+          idx += HexStringFromUint64(val, &buffer[idx], true);
           break;
         }
 
@@ -299,23 +299,27 @@ inline uint64 Uint64FromDecimalString(const char* decimal) {
   return (uint64)Int64FromDecimalString(decimal);
 }
 
-inline size_t HexStringFromInt32(int32 decimal, char* buffer) {
-  return HexStringFromInt64((int64)decimal, buffer);
+inline size_t HexStringFromInt32(int32 decimal, char* buffer,
+                                 bool make_contain_prefix) {
+  return HexStringFromInt64((int64)decimal, buffer, make_contain_prefix);
 }
 
 inline size_t DecimalStringFromInt32(int32 decimal, char* buffer) {
   return DecimalStringFromInt64((int64)decimal, buffer);
 }
 
-size_t HexStringFromInt64(int64 decimal, char* buffer) {
+size_t HexStringFromInt64(int64 decimal, char* buffer,
+                          bool make_contain_prefix) {
   size_t start_idx = 0;
 
   if (decimal < 0) {
     buffer[start_idx++] = '-';
     decimal *= -1;
   }
-  buffer[start_idx++] = '0';
-  buffer[start_idx++] = 'x';
+  if (make_contain_prefix) {
+    buffer[start_idx++] = '0';
+    buffer[start_idx++] = 'x';
+  }
 
   size_t idx = start_idx;
   if (!decimal) {
@@ -362,11 +366,14 @@ size_t DecimalStringFromInt64(int64 decimal, char* buffer) {
   return idx;
 }
 
-size_t HexStringFromUint64(uint64 decimal, char* buffer) {
+size_t HexStringFromUint64(uint64 decimal, char* buffer,
+                           bool make_contain_prefix) {
   size_t start_idx = 0;
 
-  buffer[start_idx++] = '0';
-  buffer[start_idx++] = 'x';
+  if (make_contain_prefix) {
+    buffer[start_idx++] = '0';
+    buffer[start_idx++] = 'x';
+  }
 
   size_t idx = start_idx;
   if (!decimal) {
@@ -420,7 +427,7 @@ size_t ltoa(int64 l, char* buffer) { return ltoa_with_radix(l, buffer, 10); }
 size_t ltoa_with_radix(int64 l, char* buffer, int radix) {
   switch (radix) {
     case 16:
-      return HexStringFromInt64(l, buffer);
+      return HexStringFromInt64(l, buffer, true);
     default:
     case 10:
       return DecimalStringFromInt64(l, buffer);

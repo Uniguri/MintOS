@@ -38,11 +38,14 @@ int64 Int64FromHexString(const char* hex);
 int64 Int64FromDecimalString(const char* decimal);
 uint64 Uint64FromHexString(const char* hex);
 uint64 Uint64FromDecimalString(const char* decimal);
-size_t HexStringFromInt32(int32 decimal, char* buffer);
+size_t HexStringFromInt32(int32 decimal, char* buffer,
+                          bool make_contain_prefix);
 size_t DecimalStringFromInt32(int32 decimal, char* buffer);
-size_t HexStringFromInt64(int64 decimal, char* buffer);
+size_t HexStringFromInt64(int64 decimal, char* buffer,
+                          bool make_contain_prefix);
 size_t DecimalStringFromInt64(int64 decimal, char* buffer);
-size_t HexStringFromUint64(uint64 decimal, char* buffer);
+size_t HexStringFromUint64(uint64 decimal, char* buffer,
+                           bool make_contain_prefix);
 size_t DecimalStringFromUint64(uint64 decimal, char* buffer);
 
 size_t itoa(int32 i, char* buffer);
