@@ -12,10 +12,28 @@ inline uint8 kGetPortByte(uint16 port) {
   return (uint8)(data & 0xFF);
 }
 
+inline uint16 kGetPortWord(uint16 port) {
+  uint64 data = 0;
+  asm volatile(
+      // Read data from port
+      "in ax, dx\n"
+      : [data] "=a"(data)
+      : [port] "d"(port));
+  return (uint16)(data & 0xFFFF);
+}
+
 inline void kSetPortByte(uint16 port, uint8 data) {
   asm volatile(
       // Set data on port.
       "out dx, al\n"
+      :
+      : [port] "d"((uint64)port), [data] "a"(data));
+}
+
+inline void kSetPortWord(uint16 port, uint16 data) {
+  asm volatile(
+      // Set data on port.
+      "out dx, ax\n"
       :
       : [port] "d"((uint64)port), [data] "a"(data));
 }
