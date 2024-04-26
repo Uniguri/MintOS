@@ -61,8 +61,8 @@ typedef struct kHDDInformationStruct {
   uint16 model_number[20];
   uint16 reserved2[13];
 
-  uint16 total_sectors;
-  uint16 reserved3[196];
+  uint32 total_sectors;
+  uint16 reserved3[196 - 1];
 } HDDInformation;
 
 typedef struct kHDDManagerStruct {
