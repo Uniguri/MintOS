@@ -2,6 +2,7 @@
 #include "ConsoleShell.h"
 #include "Descriptor.h"
 #include "DynamicMemory.h"
+#include "FileSystem.h"
 #include "HardDisk.h"
 #include "Interrupt.h"
 #include "Keyboard.h"
@@ -70,6 +71,14 @@ void Main(void) {
   printf("HDD Initialize..............................[    ]");
   kSetCursor(45, cursor_y++);
   if (kInitializeHDD()) {
+    printf("Pass\n");
+  } else {
+    printf("Fail\n");
+  }
+
+  printf("File System Initialize......................[    ]");
+  kSetCursor(45, cursor_y++);
+  if (kInitializeFileSystem() == true) {
     printf("Pass\n");
   } else {
     printf("Fail\n");

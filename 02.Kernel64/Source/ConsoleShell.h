@@ -53,5 +53,11 @@ static void kConsoleTestRandomAllocation(const char* parameter_buffer);
 static void kShowHDDInformation(const char* parameter_buffer);
 static void kReadSector(const char* parameter_buffer);
 static void kWriteSector(const char* parameter_buffer);
+static void kMountHDD(const char* parameter_buffer);
+static void kFormatHDD(const char* parameter_buffer);
+static void kShowFileSystemInformation(const char* parameter_buffer);
+static void kCreateFileInRootDirectory(const char* parameter_buffer);
+static void kDeleteFileInRootDirectory(const char* parameter_buffer);
+static void kShowRootDirectory(const char* parameter_buffer);
 
 #endif

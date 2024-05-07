@@ -2,6 +2,7 @@
 
 #include "Console.h"
 #include "DynamicMemory.h"
+#include "FileSystem.h"
 #include "HardDisk.h"
 #include "Hardware.h"
 #include "Interrupt.h"
@@ -50,6 +51,15 @@ ShellCommandEntry command_table[] = {
      kReadSector},
     {"writesector", "Write HDD Sector, ex)writesector 0(LBA) 10(count)",
      kWriteSector},
+    {"mounthdd", "Mount HDD", kMountHDD},
+    {"formathdd", "Format HDD", kFormatHDD},
+    {"filesysteminfo", "Show File System Information",
+     kShowFileSystemInformation},
+    {"createfile", "Create File, ex)createfile a.txt",
+     kCreateFileInRootDirectory},
+    {"deletefile", "Delete File, ex)deletefile a.txt",
+     kDeleteFileInRootDirectory},
+    {"ls", "Show Directory", kShowRootDirectory},
 };
 
 void kStartConsoleShell(void) {
@@ -864,5 +874,163 @@ ERROR:
   printf("ex) writesector 0(LBA) 10(count)\n");
   return;
 }
+
+static void kMountHDD(const char* parameter_buffer) {
+  if (kMount() == false) {
+    printf("HDD Mount Fail\n");
+  }
+}
+
+static void kFormatHDD(const char* parameter_buffer) {
+  if (kFormat() == false) {
+    printf("HDD Format Fail\n");
+  }
+}
+
+static void kShowFileSystemInformation(const char* parameter_buffer) {
+  FileSystemManager manager;
+  kGetFileSystemInformation(&manager);
+
+  printf("================== File System Information ==================\n");
+  printf("Mouted:\t\t\t\t\t %d\n", manager.mounted);
+  printf("Reserved Sector Count:\t\t\t %d Sector\n",
+         manager.reserved_sector_count);
+  printf("Cluster Link Table Start Address:\t %d Sector\n",
+         manager.cluster_link_area_start_address);
+  printf("Cluster Link Table Size:\t\t %d Sector\n",
+         manager.cluster_link_area_size);
+  printf("Data Area Start Address:\t\t %d Sector\n",
+         manager.data_area_start_address);
+  printf("Total Cluster Count:\t\t\t %d Cluster\n",
+         manager.total_cluster_count);
+}
+
+static void kCreateFileInRootDirectory(const char* parameter_buffer) {
+  MAKE_LIST_AND_PARAM(parameter_buffer);
+
+  DirectoryEntry entry;
+  size_t file_name_len = GET_NEXT_PARAM();
+
+  if (file_name_len == 0) {
+    goto ERROR;
+  } else if (file_name_len > sizeof(entry.file_name) - 1) {
+    printf("Too long file name\n");
+    return;
+  }
+
+  uint32 cluster = kFindFreeCluster();
+  if (cluster == FILESYSTEM_LAST_CLUSTER ||
+      kSetClusterLinkData(cluster, FILESYSTEM_LAST_CLUSTER) == false) {
+    printf("Cluster Allocation Fail\n");
+    return;
+  }
+
+  int directory_entry_index = kFindFreeDirectoryEntry();
+  if (directory_entry_index == -1) {
+    kSetClusterLinkData(cluster, FILESYSTEM_FREE_CLUSTER);
+    printf("Directory Entry is full\n");
+    return;
+  }
+
+  memcpy(entry.file_name, param, file_name_len);
+  entry.start_cluster_index = cluster;
+  entry.file_size = 0;
+
+  if (kSetDirectoryEntryData(directory_entry_index, &entry) == false) {
+    kSetClusterLinkData(cluster, FILESYSTEM_FREE_CLUSTER);
+    printf("Directory Entry Set Fail\n");
+    return;
+  }
+  return;
+
+ERROR:
+  printf("ex) createfile a.txt");
+  return;
+}
+
+static void kDeleteFileInRootDirectory(const char* parameter_buffer) {
+  MAKE_LIST_AND_PARAM(parameter_buffer);
+
+  DirectoryEntry entry;
+  size_t file_name_len = GET_NEXT_PARAM();
+
+  if (file_name_len == 0) {
+    goto ERROR;
+  } else if (file_name_len > sizeof(entry.file_name) - 1 ||
+             file_name_len == 0) {
+    printf("Too Long File Name\n");
+    return;
+  }
+  int directory_entry_index = kFindDirectoryEntry(param, &entry);
+  if (directory_entry_index == -1) {
+    printf("File Not Found\n");
+    return;
+  }
+
+  if (kSetClusterLinkData(entry.start_cluster_index, FILESYSTEM_FREE_CLUSTER) ==
+      false) {
+    printf("Cluster Free Fail\n");
+    return;
+  }
+
+  memset(&entry, 0, sizeof(entry));
+  if (kSetDirectoryEntryData(directory_entry_index, &entry) == false) {
+    printf("Root Directory Update Fail\n");
+    return;
+  }
+  return;
+
+ERROR:
+  printf("ex) deletefile a.txt");
+  return;
+}
+
+static void kShowRootDirectory(const char* parameter_buffer) {
+  char buffer[400];
+  char temp_value[50];
+  uint8* cluster_buffer = kAllocateMemory(FILESYSTEM_SECTORS_PER_CLUSTER * 512);
+  if (kReadCluster(0, cluster_buffer) == false) {
+    kFreeMemory(cluster_buffer);
+    printf("Root Directory Read Fail\n");
+    return;
+  }
+
+  DirectoryEntry* entry = (DirectoryEntry*)cluster_buffer;
+  int total_count = 0, total_byte = 0;
+  for (int i = 0; i < FILESYSTEM_MAX_DIRECTORY_ENTRY_COIUNT; ++i) {
+    if (entry[i].start_cluster_index == 0) {
+      continue;
+    }
+    ++total_count;
+    total_byte += entry[i].file_size;
+  }
+
+  int count = 0;
+  for (int i = 0; i < FILESYSTEM_MAX_DIRECTORY_ENTRY_COIUNT; ++i) {
+    if (entry[i].start_cluster_index == 0) {
+      continue;
+    }
+    memset(buffer, ' ', sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = 0;
+
+    memcpy(buffer, entry[i].file_name, strlen(entry[i].file_name));
+    snprintf(temp_value, 50, "%d Byte", entry[i].file_size);
+    memcpy(buffer + 30, temp_value, strlen(temp_value));
+
+    snprintf(temp_value, 50, "%p Cluster", entry[i].start_cluster_index);
+    memcpy(buffer + 50, temp_value, strlen(temp_value) + 1);
+    printf("    %s\n", buffer);
+
+    if (count != 0 && count % 20 == 0) {
+      printf("Press any key to continue... ('q' is exit) : ");
+      if (getch() == 'q') {
+        printf("\n");
+        break;
+      }
+    }
+    ++count;
+  }
+}
+
 #undef MAKE_LIST_AND_PARAM
 #undef GET_NEXT_PARAM
