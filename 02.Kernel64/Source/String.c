@@ -202,6 +202,7 @@ char* strncpy(char* s1, const char* s2, size_t count) {
   while (now_count++ < count && *s2) {
     *p++ = *s2++;
   }
+  *p = 0;
   return s1;
 }
 
