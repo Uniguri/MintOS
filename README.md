@@ -10,3 +10,4 @@ I cannot check all differences. T^T..
 ## Issue
 
 1. Sometime SS register is zero after ireq on kISRTimer.
+2. If HDD is bigger than 127G, cannot detect size of HDD.
