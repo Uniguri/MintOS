@@ -16,4 +16,7 @@
 #define BYTE_FROM_GB(x) ((size_t)BYTE_FROM_MB((x)) << 10llu)
 #define BYTE_FROM_TB(x) ((size_t)BYTE_FROM_GB((x)) << 10llu)
 
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+
 #endif
