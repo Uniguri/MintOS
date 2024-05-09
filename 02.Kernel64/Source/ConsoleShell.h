@@ -59,5 +59,8 @@ static void kShowFileSystemInformation(const char* parameter_buffer);
 static void kCreateFileInRootDirectory(const char* parameter_buffer);
 static void kDeleteFileInRootDirectory(const char* parameter_buffer);
 static void kShowRootDirectory(const char* parameter_buffer);
+static void kWriteDataToFile(const char* parameter_buffer);
+static void kReadDataFromFile(const char* parameter_buffer);
+static void kTestFileIO(const char* parameter_buffer);
 
 #endif
